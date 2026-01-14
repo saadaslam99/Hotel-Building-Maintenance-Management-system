@@ -38,7 +38,7 @@ export function IssueActionDrawer({ issue, open, onOpenChange, onUpdate }: Issue
     useEffect(() => {
         if (issue && open) {
             // Reset form
-            setPriority(issue.priority || 'MEDIUM');
+            setPriority(issue.priority || IssuePriority.MEDIUM);
             setVendor(issue.assigned_vendor_name || '');
             setNote('');
 

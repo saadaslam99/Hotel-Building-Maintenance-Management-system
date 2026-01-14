@@ -17,6 +17,7 @@ function Label({
         className
       )}
       {...props}
+      suppressHydrationWarning
     />
   )
 }

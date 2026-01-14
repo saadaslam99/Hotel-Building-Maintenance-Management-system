@@ -93,7 +93,7 @@ export function Sidebar({ className }: { className?: string }) {
 
                 <div className="px-3 py-2 mt-auto">
                     <div className="space-y-1">
-                        <Link href="/app/profile">
+                        <Link href="/app/settings">
                             <Button variant="ghost" className="w-full justify-start text-slate-400 hover:text-white hover:bg-slate-800">
                                 <Settings className="mr-2 h-4 w-4" />
                                 Profile / Settings

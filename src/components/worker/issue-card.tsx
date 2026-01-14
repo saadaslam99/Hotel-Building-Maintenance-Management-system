@@ -53,7 +53,7 @@ export function IssueCard({ issue, onView }: IssueCardProps) {
                 <div className="flex items-center gap-2">
                     <MapPin className="h-4 w-4" />
                     <span>
-                        {issue.location_type === 'UNIT' ? `Unit ${issue.unit_no || '?'}` : issue.other_area}
+                        {issue.location_type === 'UNIT' ? `Unit ${issue.unit_id || '?'}` : issue.other_area}
                         {/* Note: unit_no isn't on Issue, Issue has unit_id. We need to fetch unit or just show ID for mock speed. 
                   Actually I should join data. For now, showing raw or simple. 
                   Wait, issue.unit_id is ID. I need to fetch unit info. 

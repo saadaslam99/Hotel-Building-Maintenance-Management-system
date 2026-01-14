@@ -2,7 +2,7 @@ import { db } from './db';
 import {
     User, UserRole, Issue, IssueStatus, IssuePriority, Project,
     Unit, Client, WorkerProjectAssignment, ClientUnitAssignment,
-    LocationType, ProofType, MediaType
+    LocationType, ProofType, MediaType, IssueAttachment
 } from './types';
 
 const DELAY_MS = 600;

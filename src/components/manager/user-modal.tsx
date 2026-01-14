@@ -18,9 +18,9 @@ const formSchema = z.object({
     fullName: z.string().min(2, 'Name too short'),
     employeeId: z.string().min(2, 'ID too short'),
     phone: z.string().min(5, 'Phone required'),
-    password: z.string().min(4, 'Password too short'),
+    password: z.string().min(4, 'Password too short').optional().or(z.literal('')),
     role: z.enum(['WORKER', 'MANAGER', 'ADMIN']),
-    active: z.string().transform(v => v === 'true'), // select returns string
+    active: z.boolean(),
 });
 
 interface UserModalProps {
@@ -42,7 +42,7 @@ export function UserModal({ user, role, open, onOpenChange, onSuccess }: UserMod
             phone: '',
             password: '',
             role: role,
-            active: true as any,
+            active: true,
         },
     });
 
@@ -54,7 +54,7 @@ export function UserModal({ user, role, open, onOpenChange, onSuccess }: UserMod
                 phone: user.phone || '',
                 password: user.password || '',
                 role: user.role,
-                active: String(user.active) as any
+                active: user.active
             });
         } else if (open) {
             form.reset({
@@ -63,7 +63,7 @@ export function UserModal({ user, role, open, onOpenChange, onSuccess }: UserMod
                 phone: '',
                 password: '',
                 role: role,
-                active: 'true' as any
+                active: true
             });
         }
     }, [user, open, role, form]);
@@ -75,7 +75,7 @@ export function UserModal({ user, role, open, onOpenChange, onSuccess }: UserMod
                 await api.users.update(user.id, {
                     full_name: values.fullName,
                     phone: values.phone,
-                    active: values.active as boolean,
+                    active: values.active,
                     // employee_id usually immutable, but allowing for demo
                 });
                 toast.success('User updated');
@@ -84,9 +84,9 @@ export function UserModal({ user, role, open, onOpenChange, onSuccess }: UserMod
                     full_name: values.fullName,
                     employee_id: values.employeeId,
                     phone: values.phone,
-                    password: values.password,
+                    password: values.password || '1234',
                     role: values.role as UserRole,
-                    active: values.active as boolean,
+                    active: values.active,
                 });
                 toast.success('User created');
             }
@@ -159,7 +159,11 @@ export function UserModal({ user, role, open, onOpenChange, onSuccess }: UserMod
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Status</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={String(field.value)}>
+                                    <Select
+                                        onValueChange={(v) => field.onChange(v === 'true')}
+                                        defaultValue={field.value ? 'true' : 'false'}
+                                        value={field.value ? 'true' : 'false'}
+                                    >
                                         <FormControl>
                                             <SelectTrigger><SelectValue /></SelectTrigger>
                                         </FormControl>
