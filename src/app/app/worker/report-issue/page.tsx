@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth-store';
 import { api } from '@/mock/api';
-import { LocationType, ProofType, MediaType, UserRole } from '@/mock/types';
+import { LocationType, ProofType, MediaType, IssueStatus, IssuePriority } from '@/mock/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -16,7 +17,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { toast } from 'sonner';
-import { Loader2, UploadCloud } from 'lucide-react';
+import { Loader2, Mic, Square, Trash2 } from 'lucide-react';
 
 const formSchema = z.object({
     projectId: z.string().min(1),
@@ -36,6 +37,14 @@ export default function ReportIssuePage() {
     const [loading, setLoading] = useState(false);
     const [projectUnits, setProjectUnits] = useState<{ id: string, unit_no: string }[]>([]);
     const [activeProject, setActiveProject] = useState<{ id: string, name: string } | null>(null);
+
+    // Audio State
+    const [isRecording, setIsRecording] = useState(false);
+    const [isMocking, setIsMocking] = useState(false);
+    const [audioUrl, setAudioUrl] = useState<string | null>(null);
+    const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+    const [recordingTime, setRecordingTime] = useState(0);
+    const [timerInterval, setTimerInterval] = useState<NodeJS.Timeout | null>(null);
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -88,6 +97,108 @@ export default function ReportIssuePage() {
         if (user) checkAssignment();
     }, [user, form]);
 
+    // Cleanup audio URL on unmount
+    useEffect(() => {
+        return () => {
+            if (audioUrl) URL.revokeObjectURL(audioUrl);
+            if (timerInterval) clearInterval(timerInterval);
+        };
+    }, [audioUrl, timerInterval]);
+
+    const startRecording = async () => {
+        // Reset states
+        setIsMocking(false);
+        setMediaRecorder(null);
+
+        const runTimer = () => {
+            setRecordingTime(0);
+            const interval = setInterval(() => {
+                setRecordingTime(prev => prev + 1);
+            }, 1000);
+            setTimerInterval(interval);
+        };
+
+        // Check for browser support and secure context
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            toast.warning('Microphone API unavailable. Simulating recording for testing.');
+            setIsRecording(true);
+            setIsMocking(true);
+            runTimer();
+            return;
+        }
+
+        try {
+            // This explicitly asks for permission
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+            const recorder = new MediaRecorder(stream);
+            const chunks: BlobPart[] = [];
+
+            recorder.ondataavailable = (e) => chunks.push(e.data);
+            recorder.onstop = () => {
+                const blob = new Blob(chunks, { type: 'audio/webm' });
+                const url = URL.createObjectURL(blob);
+                setAudioUrl(url);
+                // Important: Release the microphone
+                stream.getTracks().forEach(track => track.stop());
+            };
+
+            recorder.start();
+            setMediaRecorder(recorder);
+            setIsRecording(true);
+            runTimer();
+
+        } catch (err: unknown) {
+            const error = err as Error;
+            console.error('Error accessing microphone:', error);
+            if (error.name === 'NotFoundError') {
+                toast.warning('No microphone found. Starting simulation mode.');
+                setIsRecording(true);
+                setIsMocking(true);
+                runTimer();
+            } else if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+                toast.error('Permission denied. Please allow microphone access in your browser settings.');
+            } else {
+                // Fallback for other errors
+                toast.warning('Could not access microphone. Simulating recording.');
+                setIsRecording(true);
+                setIsMocking(true);
+                runTimer();
+            }
+        }
+    };
+
+    const stopRecording = () => {
+        if (timerInterval) {
+            clearInterval(timerInterval);
+            setTimerInterval(null);
+        }
+        setIsRecording(false);
+
+        if (isMocking) {
+            // Create dummy blob
+            const blob = new Blob(['Mock audio content'], { type: 'text/plain' });
+            // Use a sample audio file for better UX if possible, but strict blob is fine for now
+            const url = URL.createObjectURL(blob);
+            setAudioUrl(url);
+            toast.info('Recording simulated.');
+        } else if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+        }
+    };
+
+    const deleteRecording = () => {
+        if (audioUrl) URL.revokeObjectURL(audioUrl);
+        setAudioUrl(null);
+        setRecordingTime(0);
+    };
+
+    const formatTime = (seconds: number) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+
     const onSubmit = async (values: z.infer<typeof formSchema>) => {
         if (!user) return;
         setLoading(true);
@@ -105,12 +216,13 @@ export default function ReportIssuePage() {
                 issue_caused_by: values.issueCausedBy,
                 complaint_type: finalComplaintType,
                 description_text: values.description,
-                status: 'OPEN', // Enum mismatch if string? IssueStatus.OPEN is fine.
+                status: IssueStatus.OPEN,
                 is_actionable: true,
                 approved: false,
                 verified: false,
-                priority: 'MEDIUM' // Default
-            } as any);
+                priority: IssuePriority.MEDIUM, // Default
+                voice_url: audioUrl || undefined // Add voice URL if exists
+            });
 
             // Add attachment
             await api.issues.addAttachment({
@@ -122,7 +234,7 @@ export default function ReportIssuePage() {
 
             toast.success('Issue reported successfully');
             router.push('/app/worker/dashboard');
-        } catch (error: any) {
+        } catch (error: unknown) {
             toast.error('Failed to report issue');
             console.error(error);
         } finally {
@@ -330,8 +442,13 @@ export default function ReportIssuePage() {
                                                 className="cursor-pointer"
                                             />
                                             {field.value && (
-                                                <div className="h-10 w-10 bg-slate-200 rounded overflow-hidden flex-shrink-0">
-                                                    <img src={field.value} alt="Preview" className="h-full w-full object-cover" />
+                                                <div className="h-10 w-10 bg-slate-200 rounded overflow-hidden flex-shrink-0 relative">
+                                                    <Image
+                                                        src={field.value}
+                                                        alt="Preview"
+                                                        fill
+                                                        className="object-cover"
+                                                    />
                                                 </div>
                                             )}
                                         </div>
@@ -339,6 +456,59 @@ export default function ReportIssuePage() {
                                     </FormItem>
                                 )}
                             />
+
+                            {/* Voice Note */}
+                            <div className="space-y-3">
+                                <FormLabel>Voice Description (Optional)</FormLabel>
+                                <div className="border rounded-md p-4 bg-slate-50 dark:bg-slate-900/50">
+                                    {!audioUrl ? (
+                                        <div className="flex flex-col items-center gap-3">
+                                            {isRecording ? (
+                                                <div className="flex flex-col items-center gap-2">
+                                                    <div className="animate-pulse h-3 w-3 bg-red-500 rounded-full mb-1" />
+                                                    <span className="text-sm font-mono font-medium">{formatTime(recordingTime)}</span>
+                                                    <Button
+                                                        type="button"
+                                                        variant="destructive"
+                                                        size="icon"
+                                                        className="h-12 w-12 rounded-full"
+                                                        onClick={stopRecording}
+                                                    >
+                                                        <Square className="h-5 w-5 fill-current" />
+                                                    </Button>
+                                                    <span className="text-xs text-muted-foreground mt-1">Tap to Stop</span>
+                                                </div>
+                                            ) : (
+                                                <div className="flex flex-col items-center gap-2">
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="icon"
+                                                        className="h-12 w-12 rounded-full border-2 border-primary/20 hover:border-primary/50 hover:bg-primary/5"
+                                                        onClick={startRecording}
+                                                    >
+                                                        <Mic className="h-5 w-5 text-primary" />
+                                                    </Button>
+                                                    <span className="text-xs text-muted-foreground mt-1">Tap to Record Voice Note</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-3 w-full">
+                                            <audio controls src={audioUrl} className="flex-1 h-10" />
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                onClick={deleteRecording}
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
 
                             <Button type="submit" className="w-full" disabled={loading}>
                                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

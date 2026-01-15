@@ -2,7 +2,7 @@ import { db } from './db';
 import {
     User, UserRole, Issue, IssueStatus, IssuePriority, Project,
     Unit, Client, WorkerProjectAssignment, ClientUnitAssignment,
-    LocationType, ProofType, MediaType, IssueAttachment
+    LocationType, ProofType, MediaType, IssueAttachment, SystemLog
 } from './types';
 
 const DELAY_MS = 600;
@@ -38,6 +38,20 @@ export const api = {
         getAll: async (): Promise<Issue[]> => delay(db.get('issues')),
         getByProject: async (projectId: string): Promise<Issue[]> => delay(db.get('issues').filter(i => i.project_id === projectId)),
         getById: async (id: string): Promise<Issue | undefined> => delay(db.find('issues', (i) => i.id === id)),
+        // Get active issues (excluding resolved+verified and rejected)
+        getActive: async (): Promise<Issue[]> => {
+            const issues = db.get('issues');
+            return delay(issues.filter(i =>
+                !((i.status === IssueStatus.RESOLVED && i.verified) || i.status === IssueStatus.REJECTED)
+            ));
+        },
+        // Get history issues (resolved+verified and rejected)
+        getHistory: async (): Promise<Issue[]> => {
+            const issues = db.get('issues');
+            return delay(issues.filter(i =>
+                (i.status === IssueStatus.RESOLVED && i.verified) || i.status === IssueStatus.REJECTED
+            ));
+        },
         create: async (issue: Omit<Issue, 'id' | 'created_at' | 'updated_at'>): Promise<Issue> => {
             const newIssue: Issue = {
                 ...issue,
@@ -69,6 +83,7 @@ export const api = {
         getAll: async (): Promise<User[]> => delay(db.get('users')),
         getWorkers: async (): Promise<User[]> => delay(db.get('users').filter(u => u.role === UserRole.WORKER)),
         getManagers: async (): Promise<User[]> => delay(db.get('users').filter(u => u.role === UserRole.MANAGER)),
+        getAdmins: async (): Promise<User[]> => delay(db.get('users').filter(u => u.role === UserRole.ADMIN)),
         create: async (user: Omit<User, 'id' | 'created_at' | 'updated_at'>): Promise<User> => {
             const newUser = {
                 ...user,
@@ -79,6 +94,28 @@ export const api = {
             return delay(db.create('users', newUser));
         },
         update: async (id: string, updates: Partial<User>) => delay(db.update('users', id, updates) as User),
+        // Deactivate user instead of deleting (FROZEN STATE compliance)
+        deactivate: async (id: string, reason?: string): Promise<User> => {
+            await delay(null);
+            const updated = db.update('users', id, {
+                active: false,
+                inactive_reason: reason || 'Deactivated by admin',
+                updated_at: new Date().toISOString()
+            });
+            if (!updated) throw new Error('User not found');
+            return updated as User;
+        },
+        // Reactivate user
+        reactivate: async (id: string): Promise<User> => {
+            await delay(null);
+            const updated = db.update('users', id, {
+                active: true,
+                inactive_reason: undefined,
+                updated_at: new Date().toISOString()
+            });
+            if (!updated) throw new Error('User not found');
+            return updated as User;
+        },
     },
 
     units: {
@@ -91,6 +128,19 @@ export const api = {
             };
             db.update('units', assignment.unit_id, { is_occupied: true });
             return delay(db.create('clientAssignments', newAssign));
+        }
+    },
+
+    logs: {
+        getAll: async (): Promise<SystemLog[]> => delay(db.get('logs')),
+        create: async (log: Omit<SystemLog, 'id' | 'created_at'>): Promise<SystemLog> => {
+            const newLog: SystemLog = {
+                ...log,
+                id: 'log-' + Date.now(),
+                created_at: new Date().toISOString(),
+            };
+            await delay(null);
+            return db.create('logs', newLog);
         }
     }
 };
