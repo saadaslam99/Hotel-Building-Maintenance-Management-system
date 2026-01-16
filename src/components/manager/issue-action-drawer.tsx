@@ -110,7 +110,7 @@ export function IssueActionDrawer({ issue, open, onOpenChange, onUpdate }: Issue
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent className="w-[450px] sm:w-[540px] flex flex-col p-0 gap-0">
-                <SheetHeader className="px-6 py-4 border-b bg-muted/30">
+                <SheetHeader className="pl-6 pr-12 py-4 border-b bg-muted/30">
                     <div className="flex items-start justify-between">
                         <div>
                             <SheetTitle className="text-xl">Issue #{issue.id.slice(-4)}</SheetTitle>
@@ -132,7 +132,7 @@ export function IssueActionDrawer({ issue, open, onOpenChange, onUpdate }: Issue
                     </div>
                 </SheetHeader>
 
-                <ScrollArea className="flex-1 px-6 py-6">
+                <ScrollArea className="flex-1 px-6 py-6 min-h-0">
                     <div className="space-y-8">
                         {/* Primary Issue Info */}
                         <div className="space-y-4">
