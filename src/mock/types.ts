@@ -127,21 +127,31 @@ export interface Issue {
   complaint_type: string;
   description_text?: string;
   voice_url?: string;
-  
+
   status: IssueStatus;
   priority?: IssuePriority;
-  
+
   assigned_vendor_name?: string;
-  
+
   approved: boolean;
   approved_by_user_id?: string;
-  
+
   verified: boolean;
   verified_at?: string;
   verified_by_user_id?: string;
-  
+
   is_actionable: boolean; // Computed helper or stored? "verified=false" AND "status=RESOLVED" implies actionable for manager? Request says "TOTAL_ACTIONABLE" stats.
-  
+
   created_at: string;
   updated_at: string;
+}
+
+export interface SystemLog {
+  id: string;
+  action: string;
+  entity_type: string;
+  entity_id: string;
+  performed_by_user_id: string;
+  details?: string;
+  created_at: string;
 }

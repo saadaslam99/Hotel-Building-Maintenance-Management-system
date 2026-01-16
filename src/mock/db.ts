@@ -1,6 +1,6 @@
 import {
     User, Project, Unit, Client, WorkerProjectAssignment, ClientUnitAssignment,
-    Issue, IssueAttachment, IssueStatusHistory
+    Issue, IssueAttachment, IssueStatusHistory, SystemLog
 } from './types';
 import {
     SEED_USERS, SEED_PROJECTS, SEED_UNITS, SEED_CLIENTS,
@@ -19,6 +19,7 @@ export interface MockSchema {
     issues: Issue[];
     attachments: IssueAttachment[];
     history: IssueStatusHistory[];
+    logs: SystemLog[];
 }
 
 const INITIAL_DB: MockSchema = {
@@ -31,6 +32,7 @@ const INITIAL_DB: MockSchema = {
     issues: SEED_ISSUES,
     attachments: SEED_ATTACHMENTS,
     history: [],
+    logs: [],
 };
 
 class MockDatabase {
@@ -61,10 +63,8 @@ class MockDatabase {
         this.data = data;
     }
 
-    public reset() {
-        this.save(INITIAL_DB);
-        window.location.reload();
-    }
+    // FROZEN STATE: Reset operation is permanently disabled to prevent data loss
+    // public reset() { ... } - REMOVED
 
     // Generic helpers
     public get<K extends keyof MockSchema>(collection: K): MockSchema[K] {
@@ -103,13 +103,11 @@ class MockDatabase {
         return updatedItem;
     }
 
+    // FROZEN STATE: Delete operation is permanently disabled to prevent data loss
+    // All data must be preserved permanently - use deactivation instead
     public delete<K extends keyof MockSchema>(collection: K, id: string): boolean {
-        const list = this.data[collection] as any[];
-        const newList = list.filter((item) => item.id !== id);
-        if (newList.length === list.length) return false;
-
-        this.save({ ...this.data, [collection]: newList });
-        return true;
+        console.error('DELETE OPERATION BLOCKED: Data deletion is permanently disabled.');
+        throw new Error('Delete operation is not allowed. Data must be preserved permanently.');
     }
 }
 

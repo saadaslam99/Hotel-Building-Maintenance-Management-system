@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store/auth-store';
+import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,13 +11,20 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { User, Lock, Bell, Settings, Shield, Globe } from 'lucide-react';
+import {
+    User,
+    Lock,
+    Bell,
+    Settings,
+    Shield,
+    Save,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function SettingsPage() {
     const { user } = useAuthStore();
+    const { theme, setTheme } = useTheme();
     const [activeTab, setActiveTab] = useState('profile');
     const [isLoading, setIsLoading] = useState(false);
 
@@ -30,8 +38,21 @@ export default function SettingsPage() {
         marketingEmails: false,
     });
 
+    // Sync theme preference on mount - only once to avoid render loop
+    useEffect(() => {
+        if (theme && theme !== preferences.theme) {
+            setPreferences(prev => ({ ...prev, theme }));
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [theme]);
+
     const handleSavePreferences = () => {
         setIsLoading(true);
+        // Apply theme change
+        if (preferences.theme) {
+            setTheme(preferences.theme);
+        }
+
         // Mock API call
         setTimeout(() => {
             setIsLoading(false);
@@ -101,10 +122,10 @@ export default function SettingsPage() {
                                         Your personal information. Managed by your organization administrator.
                                     </CardDescription>
                                 </CardHeader>
-                                <CardContent className="space-y-8">
-                                    <div className="flex items-center gap-6">
+                                <CardContent className="p-0">
+                                    <div className="flex items-center gap-6 p-6">
                                         <Avatar className="h-20 w-20">
-                                            <AvatarImage src="" /> {/* Fallback if no image */}
+                                            <AvatarImage src="" />
                                             <AvatarFallback className="text-xl bg-primary/10 text-primary">
                                                 {user.full_name.charAt(0)}
                                             </AvatarFallback>
@@ -116,8 +137,9 @@ export default function SettingsPage() {
                                             </Badge>
                                         </div>
                                     </div>
+                                    <Separator className="my-0" />
 
-                                    <div className="grid gap-6 md:grid-cols-2">
+                                    <div className="grid gap-6 md:grid-cols-2 p-6">
                                         <div className="space-y-2">
                                             <Label htmlFor="full-name">Full Name</Label>
                                             <div className="relative">
@@ -149,8 +171,9 @@ export default function SettingsPage() {
                                             />
                                         </div>
                                     </div>
+                                    <Separator className="my-0" />
 
-                                    <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg flex gap-3 text-sm text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                                    <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-b-lg flex gap-3 text-sm text-blue-700 dark:text-blue-300 border-t border-blue-200 dark:border-blue-800">
                                         <Shield className="h-5 w-5 flex-shrink-0" />
                                         <p>
                                             To update your personal details or password, please contact the IT department or your system administrator.
@@ -224,6 +247,7 @@ export default function SettingsPage() {
                                     </div>
                                     <div className="flex justify-end">
                                         <Button onClick={handleSavePreferences} disabled={isLoading}>
+                                            <Save className="mr-2 h-4 w-4" />
                                             {isLoading ? 'Saving...' : 'Save Changes'}
                                         </Button>
                                     </div>
@@ -283,6 +307,7 @@ export default function SettingsPage() {
                                     </div>
                                     <div className="flex justify-end pt-4">
                                         <Button onClick={handleSavePreferences} disabled={isLoading}>
+                                            <Save className="mr-2 h-4 w-4" />
                                             {isLoading ? 'Saving...' : 'Save Preferences'}
                                         </Button>
                                     </div>
