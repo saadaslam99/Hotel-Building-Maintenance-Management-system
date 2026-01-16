@@ -8,14 +8,21 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
-import { Building, MapPin, Calendar, Eye } from 'lucide-react';
+import { Building, MapPin, Calendar, Eye, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import Link from 'next/link';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { OccupantsTable } from '@/components/admin/occupants-table';
+
+import { CreateProjectDialog } from '@/components/admin/create-project-dialog';
 
 export default function AdminProjectsPage() {
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isCreateOpen, setIsCreateOpen] = useState(false);
 
-    useEffect(() => {
+    const fetchProjects = () => {
+        setLoading(true);
         api.projects.getAll().then((data) => {
             setProjects(data || []);
             setLoading(false);
@@ -23,6 +30,10 @@ export default function AdminProjectsPage() {
             setProjects([]);
             setLoading(false);
         });
+    };
+
+    useEffect(() => {
+        fetchProjects();
     }, []);
 
     if (loading) {
@@ -41,9 +52,15 @@ export default function AdminProjectsPage() {
                         View and manage all projects in the system.
                     </p>
                 </div>
-                <Badge variant="outline" className="text-muted-foreground">
-                    {projects.length} projects
-                </Badge>
+                <div className="flex items-center gap-3">
+                    <Badge variant="outline" className="text-muted-foreground h-9 px-4 flex items-center justify-center">
+                        {projects.length} projects
+                    </Badge>
+                    <Button onClick={() => setIsCreateOpen(true)}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Project
+                    </Button>
+                </div>
             </div>
 
             <div className="grid gap-4 md:grid-cols-3">
@@ -73,72 +90,93 @@ export default function AdminProjectsPage() {
                 </Card>
             </div>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Project List</CardTitle>
-                    <CardDescription>
-                        All projects are preserved permanently. Projects can be archived but never deleted.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="p-0">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Project Name</TableHead>
-                                <TableHead>Location</TableHead>
-                                <TableHead>Created By</TableHead>
-                                <TableHead>Created Date</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {projects.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                                        No projects found.
-                                    </TableCell>
-                                </TableRow>
-                            ) : (
-                                projects.map((project) => (
-                                    <TableRow key={project.id}>
-                                        <TableCell className="font-medium">
-                                            <div className="flex items-center gap-2">
-                                                <Building className="h-4 w-4 text-muted-foreground" />
-                                                {project.name}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                                                <MapPin className="h-3 w-3" />
-                                                {project.location || '-'}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>User {project.created_by_user_id}</TableCell>
-                                        <TableCell>
-                                            <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                                                <Calendar className="h-3 w-3" />
-                                                {format(new Date(project.created_at), 'PP')}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <Badge className="bg-green-100 text-green-700 border-green-200">
-                                                Active
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <Button variant="ghost" size="sm">
-                                                <Eye className="h-4 w-4 mr-1" />
-                                                View
-                                            </Button>
-                                        </TableCell>
+            <Tabs defaultValue="projects" className="space-y-4">
+                <TabsList>
+                    <TabsTrigger value="projects">All Projects</TabsTrigger>
+                    <TabsTrigger value="occupants">Occupants</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="projects">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Project List</CardTitle>
+                            <CardDescription>
+                                All projects are preserved permanently. Projects can be archived but never deleted.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Project Name</TableHead>
+                                        <TableHead>Location</TableHead>
+                                        <TableHead>Created By</TableHead>
+                                        <TableHead>Created Date</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
-                                ))
-                            )}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
+                                </TableHeader>
+                                <TableBody>
+                                    {projects.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                                                No projects found.
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : (
+                                        projects.map((project) => (
+                                            <TableRow key={project.id}>
+                                                <TableCell className="font-medium">
+                                                    <div className="flex items-center gap-2">
+                                                        <Building className="h-4 w-4 text-muted-foreground" />
+                                                        {project.name}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                                        <MapPin className="h-3 w-3" />
+                                                        {project.location || '-'}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>User {project.created_by_user_id}</TableCell>
+                                                <TableCell>
+                                                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                                        <Calendar className="h-3 w-3" />
+                                                        {format(new Date(project.created_at), 'PP')}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge className="bg-green-100 text-green-700 border-green-200">
+                                                        Active
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    <Link href={`/app/admin/projects/${project.id}`}>
+                                                        <Button variant="ghost" size="sm">
+                                                            <Eye className="h-4 w-4 mr-1" />
+                                                            View
+                                                        </Button>
+                                                    </Link>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="occupants">
+                    <OccupantsTable />
+                </TabsContent>
+            </Tabs>
+
+            <CreateProjectDialog
+                open={isCreateOpen}
+                onOpenChange={setIsCreateOpen}
+                onSuccess={fetchProjects}
+            />
         </div>
     );
 }

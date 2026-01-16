@@ -65,20 +65,16 @@ export interface WorkerProjectAssignment {
   ended_at?: string;
 }
 
-export interface Unit {
-  id: string;
-  project_id: string;
-  unit_no: string;
-  type?: string;
-  is_occupied: boolean;
-  created_by_user_id: string;
-  created_at: string;
-  updated_at: string;
+export enum OccupantType {
+  TENANT = 'TENANT',
+  GUEST = 'GUEST',
+  STAFF = 'STAFF',
 }
 
 export interface Client {
   id: string;
-  id_passport: string;
+  id_passport: string; // Qatar ID or Passport
+  type: OccupantType;
   name: string;
   phone?: string;
   created_at: string;
@@ -92,7 +88,19 @@ export interface ClientUnitAssignment {
   assigned_by_user_id: string;
   start_date: string;
   end_date?: string;
-  is_active: boolean;
+  is_active: boolean; // redundancy for quick query
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Unit {
+  id: string;
+  project_id: string;
+  unit_no: string;
+  type?: string;
+  is_occupied: boolean;
+  current_occupant_id?: string; // Link to Client
+  created_by_user_id: string;
   created_at: string;
   updated_at: string;
 }

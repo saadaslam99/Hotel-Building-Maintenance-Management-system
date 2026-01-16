@@ -7,6 +7,8 @@ import { Issue } from '@/mock/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatusBarChart, PriorityPieChart } from '@/components/manager/charts';
+import { IssuesOverviewChartWithColors } from '@/components/admin/charts';
+import { RecentIssuesTable } from '@/components/admin/recent-issues-table';
 import { ShieldAlert, Users, Building, Activity } from 'lucide-react';
 
 export default function AdminOverview() {
@@ -39,6 +41,15 @@ export default function AdminOverview() {
         { label: 'Active Assignments', value: '4', icon: Activity, color: 'text-yellow-500' }, // Mock
     ];
 
+    // Compute Issue Stats for Chart
+    const issueStats = [
+        { name: 'Total', value: issues.length },
+        { name: 'Open', value: issues.filter(i => i.status === 'OPEN').length },
+        { name: 'Pending', value: issues.filter(i => i.status === 'IN_PROGRESS').length },
+        { name: 'Resolved', value: issues.filter(i => i.status === 'RESOLVED' && !i.verified).length },
+        { name: 'Verified', value: issues.filter(i => i.verified).length },
+    ];
+
     return (
         <div className="space-y-6">
             <h1 className="text-2xl font-bold tracking-tight">System Overview</h1>
@@ -60,14 +71,16 @@ export default function AdminOverview() {
                 })}
             </div>
 
+            {/* Recent Issues Table */}
+            <div className="grid gap-4">
+                <RecentIssuesTable issues={issues} projects={projects} />
+            </div>
+
             <div className="grid gap-4 md:grid-cols-2">
                 <Card>
-                    <CardHeader><CardTitle>System Activity</CardTitle></CardHeader>
+                    <CardHeader><CardTitle>Issues Overview</CardTitle></CardHeader>
                     <CardContent>
-                        <StatusBarChart data={[
-                            { name: 'Open', value: issues.filter(i => i.status === 'OPEN').length },
-                            { name: 'Resolved', value: issues.filter(i => i.status === 'RESOLVED').length }
-                        ]} />
+                        <IssuesOverviewChartWithColors data={issueStats} />
                     </CardContent>
                 </Card>
                 <Card>

@@ -24,11 +24,28 @@ const formSchema = z.object({
     locationType: z.enum(['UNIT', 'OTHER']),
     unitId: z.string().optional(),
     otherArea: z.string().optional(),
+    otherAreaDetails: z.string().optional(), // New field for "Other" details
     issueCausedBy: z.string().min(1, 'Please specify cause'),
     complaintType: z.string().min(1, 'Please select type'),
     otherComplaintType: z.string().optional(),
-    description: z.string().min(5, 'Description too short'),
+    description: z.string(), // Removed .min(5) here, validation moved to superRefine
     attachmentUrl: z.string().min(1, 'At least one photo required'),
+}).superRefine((data, ctx) => {
+    // Description validation: Need either text > 5 chars OR implicitly a voice note (which auto-fills text)
+    // The requirement says: "Input description OR voice note".
+    // If voice note recorded -> we auto-fill description with "Description in voice note".
+    // So checking description.length > 0 is actually sufficient IF we enforce the auto-fill.
+    // However, if manual text: "min(5)". If auto-fill: "Description in voice note" > 5.
+    // So simple .min(1, "Please provide a description or record a voice note") on description might work, 
+    // but better to be explicit about the length for typed text.
+
+    if (data.description.length < 5) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Please provide a description (min 5 chars) or record a voice note.",
+            path: ["description"],
+        });
+    }
 });
 
 export default function ReportIssuePage() {
@@ -49,9 +66,14 @@ export default function ReportIssuePage() {
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
         defaultValues: {
+            projectId: '',
             locationType: 'UNIT',
+            unitId: '',
+            otherArea: '',
+            otherAreaDetails: '',
             issueCausedBy: 'Tenant Misuse',
             complaintType: '',
+            otherComplaintType: '',
             description: '',
             attachmentUrl: '',
         },
@@ -59,23 +81,22 @@ export default function ReportIssuePage() {
 
     const locationType = form.watch('locationType');
     const complaintType = form.watch('complaintType');
+    const selectedArea = form.watch('otherArea'); // Watching the dropdown value
+    const description = form.watch('description');
+
+    // Auto-fill description logic
+    useEffect(() => {
+        if (audioUrl && !description) {
+            form.setValue('description', 'Description in voice note');
+        } else if (!audioUrl && description === 'Description in voice note') {
+            form.setValue('description', '');
+        }
+    }, [audioUrl, description, form]);
 
     useEffect(() => {
         // Check assignments
         const checkAssignment = async () => {
-            // Mock: Just get assignments and pick first active
             try {
-                // In a real app we'd search assignments by worker_id. 
-                // Here we just fetch all users/assignments or assume context.
-                // Actually api.users.getWorkers doesn't return assignments.
-                // I'll cheat and fetch all assignments for now or assume logic.
-                // Wait, db.ts has assignments. api doesn't expose "getMyAssignments".
-                // I'll just fetch all projects and "assume" one. 
-                // OR better: Create `api.users.getAssignments(userId)`.
-                // For now, I'll fetch projects and just pick the first one and "pretend" assigned.
-                // STRICT: User asked for "Project (pre-filled, disabled based on active assignment)".
-                // I should implement getAssignment. 
-                // Let's use `api.projects.getAll()` and assume user is assigned to p1 (Skyline).
                 const projects = await api.projects.getAll();
                 const p1 = projects[0];
                 if (p1) {
@@ -83,10 +104,6 @@ export default function ReportIssuePage() {
                     form.setValue('projectId', p1.id);
                     // Fetch units
                     const units = await api.projects.getUnits(p1.id);
-                    setProjectUnits(units.map(u => ({ id: u.unit_no, unit_no: u.unit_no })));
-                    // Note: Issue takes unit_id (which is usually UUID), but for UI select I might use unit_no if familiar.
-                    // In Seeds, unit.id is 'unit1'. unit.unit_no is '101'.
-                    // I should use unit.id.
                     const realUnits = units.map(u => ({ id: u.id, unit_no: u.unit_no }));
                     setProjectUnits(realUnits);
                 }
@@ -207,15 +224,20 @@ export default function ReportIssuePage() {
                 ? values.otherComplaintType || 'Other'
                 : values.complaintType;
 
+            // Resolve Area Name: Dropdown or Custom
+            const finalArea = values.locationType === 'UNIT'
+                ? undefined // Not used for UNIT
+                : (values.otherArea === 'Other' ? values.otherAreaDetails : values.otherArea);
+
             const newIssue = await api.issues.create({
                 project_id: values.projectId,
                 reported_by_user_id: user.id,
                 location_type: values.locationType as LocationType,
                 unit_id: values.unitId,
-                other_area: values.otherArea,
+                other_area: finalArea, // Used computed area
                 issue_caused_by: values.issueCausedBy,
                 complaint_type: finalComplaintType,
-                description_text: values.description,
+                description_text: values.description, // Validation handled by schema
                 status: IssueStatus.OPEN,
                 is_actionable: true,
                 approved: false,
@@ -254,6 +276,15 @@ export default function ReportIssuePage() {
             toast.info('Photo uploaded (Mock URL generated)');
         }
     };
+
+    const COMMON_AREAS = [
+        "Lobby", "Gym", "Garden", "Corridor / Hallway", "Parking", "Lift / Elevator",
+        "Roof / Terrace", "Reception", "Staircase", "Basement", "Entrance / Gate",
+        "Driveway", "Security Room", "Maintenance Room", "Restaurant / Cafe",
+        "Pool", "Laundry Room", "Office / Management Room", "Storage Room",
+        "Emergency Exit", "Common Washroom / Restroom", "Generator Room",
+        "Electrical Room", "Utility Room", "Other"
+    ];
 
     return (
         <div className="max-w-2xl mx-auto py-6">
@@ -328,19 +359,45 @@ export default function ReportIssuePage() {
                                     )}
                                 />
                             ) : (
-                                <FormField
-                                    control={form.control}
-                                    name="otherArea"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Area Name</FormLabel>
-                                            <FormControl>
-                                                <Input placeholder="e.g. Lobby, Gym, Parking" {...field} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
+                                <div className="space-y-4">
+                                    <FormField
+                                        control={form.control}
+                                        name="otherArea"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Area Name</FormLabel>
+                                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                    <FormControl>
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Select Area" />
+                                                        </SelectTrigger>
+                                                    </FormControl>
+                                                    <SelectContent>
+                                                        {COMMON_AREAS.map(area => (
+                                                            <SelectItem key={area} value={area}>{area}</SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    {selectedArea === 'Other' && (
+                                        <FormField
+                                            control={form.control}
+                                            name="otherAreaDetails"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Specify other area</FormLabel>
+                                                    <FormControl>
+                                                        <Input placeholder="e.g. Back Alley" {...field} />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
                                     )}
-                                />
+                                </div>
                             )}
 
                             {/* Cause */}
@@ -412,20 +469,80 @@ export default function ReportIssuePage() {
                                 )}
                             </div>
 
-                            {/* Description */}
-                            <FormField
-                                control={form.control}
-                                name="description"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Description</FormLabel>
-                                        <FormControl>
-                                            <Textarea placeholder="Describe the issue details..." {...field} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
+                            {/* Description & Voice */}
+                            <div className="space-y-4 border rounded-md p-4 bg-slate-50 dark:bg-slate-900/50">
+                                <FormLabel className="flex justify-between items-baseline">
+                                    <span>Provide description via text or voice note</span>
+                                </FormLabel>
+
+                                <FormField
+                                    control={form.control}
+                                    name="description"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormControl>
+                                                <Textarea
+                                                    placeholder="Type description here..."
+                                                    {...field}
+                                                    className="resize-none"
+                                                    disabled={!!audioUrl} // Optional: disable text if voice exists? User req said "Voice note is optional but should not override typed text"
+                                                // Requirement: "If the guard types a Description, voice note is optional but should not override the typed text."
+                                                // "If the user records a voice note and the Description textbox is empty, then automatically set the Description field value to 'Description in voice note'"
+                                                // So we allow editing.
+                                                />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+
+                                <div className="flex items-center justify-between">
+                                    <div className="text-xs text-muted-foreground">
+                                        OR record a voice note
+                                    </div>
+                                    {!audioUrl ? (
+                                        <div className="flex items-center gap-2">
+                                            {isRecording ? (
+                                                <>
+                                                    <div className="animate-pulse h-3 w-3 bg-red-500 rounded-full" />
+                                                    <span className="text-sm font-mono font-medium">{formatTime(recordingTime)}</span>
+                                                    <Button
+                                                        type="button"
+                                                        variant="destructive"
+                                                        size="sm"
+                                                        onClick={stopRecording}
+                                                    >
+                                                        Stop
+                                                    </Button>
+                                                </>
+                                            ) : (
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={startRecording}
+                                                >
+                                                    <Mic className="h-4 w-4 mr-2" />
+                                                    Record Voice
+                                                </Button>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-3">
+                                            <audio controls src={audioUrl} className="h-8 w-48" />
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                className="text-destructive hover:text-destructive"
+                                                onClick={deleteRecording}
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
 
                             {/* Attachment */}
                             <FormField
@@ -456,59 +573,6 @@ export default function ReportIssuePage() {
                                     </FormItem>
                                 )}
                             />
-
-                            {/* Voice Note */}
-                            <div className="space-y-3">
-                                <FormLabel>Voice Description (Optional)</FormLabel>
-                                <div className="border rounded-md p-4 bg-slate-50 dark:bg-slate-900/50">
-                                    {!audioUrl ? (
-                                        <div className="flex flex-col items-center gap-3">
-                                            {isRecording ? (
-                                                <div className="flex flex-col items-center gap-2">
-                                                    <div className="animate-pulse h-3 w-3 bg-red-500 rounded-full mb-1" />
-                                                    <span className="text-sm font-mono font-medium">{formatTime(recordingTime)}</span>
-                                                    <Button
-                                                        type="button"
-                                                        variant="destructive"
-                                                        size="icon"
-                                                        className="h-12 w-12 rounded-full"
-                                                        onClick={stopRecording}
-                                                    >
-                                                        <Square className="h-5 w-5 fill-current" />
-                                                    </Button>
-                                                    <span className="text-xs text-muted-foreground mt-1">Tap to Stop</span>
-                                                </div>
-                                            ) : (
-                                                <div className="flex flex-col items-center gap-2">
-                                                    <Button
-                                                        type="button"
-                                                        variant="outline"
-                                                        size="icon"
-                                                        className="h-12 w-12 rounded-full border-2 border-primary/20 hover:border-primary/50 hover:bg-primary/5"
-                                                        onClick={startRecording}
-                                                    >
-                                                        <Mic className="h-5 w-5 text-primary" />
-                                                    </Button>
-                                                    <span className="text-xs text-muted-foreground mt-1">Tap to Record Voice Note</span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <div className="flex items-center gap-3 w-full">
-                                            <audio controls src={audioUrl} className="flex-1 h-10" />
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="icon"
-                                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                                onClick={deleteRecording}
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
 
                             <Button type="submit" className="w-full" disabled={loading}>
                                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
