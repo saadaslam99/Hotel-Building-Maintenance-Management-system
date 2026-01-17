@@ -47,7 +47,7 @@ export function Sidebar({ className }: { className?: string }) {
                     { href: '/app/admin/users', label: 'All Users', icon: Users },
                     { href: '/app/admin/managers', label: 'Managers', icon: Users },
                     { href: '/app/admin/workers', label: 'Workers', icon: Users },
-                    { href: '/app/admin/issues', label: 'Active Issues', icon: ListTodo },
+                    { href: '/app/admin/issues', label: 'Issues', icon: ListTodo },
                     { href: '/app/admin/history', label: 'History', icon: Archive },
                     { href: '/app/admin/logs', label: 'System Logs', icon: FileText },
                     { href: '/app/admin/projects', label: 'All Projects', icon: Building },

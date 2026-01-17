@@ -23,6 +23,7 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { PageHeader } from '@/components/ui/page-header';
 
 export default function UsersPage() {
     const [users, setUsers] = useState<User[]>([]);
@@ -117,15 +118,12 @@ export default function UsersPage() {
     };
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-                        <Users className="h-6 w-6" />
-                        User Management
-                    </h1>
-                    <p className="text-muted-foreground">Manage all users across all roles.</p>
-                </div>
+        <div className="space-y-6 container mx-auto p-6 max-w-7xl">
+            <PageHeader
+                title="User Management"
+                description="Manage all users across all roles."
+                icon={Users}
+            >
                 <div className="flex gap-2">
                     <Button variant="outline" onClick={() => handleCreate(UserRole.WORKER)}>
                         <Plus className="mr-2 h-4 w-4" /> Add Worker
@@ -137,7 +135,7 @@ export default function UsersPage() {
                         <Plus className="mr-2 h-4 w-4" /> Add Admin
                     </Button>
                 </div>
-            </div>
+            </PageHeader>
 
             <div className="grid gap-4 md:grid-cols-6">
                 <Card>

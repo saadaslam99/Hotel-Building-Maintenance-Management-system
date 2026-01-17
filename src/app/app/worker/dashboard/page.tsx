@@ -8,7 +8,8 @@ import { IssueCard } from '@/components/worker/issue-card';
 import { IssueDetailModal } from '@/components/worker/issue-detail-modal';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertCircle, CheckCircle2, Clock } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Clock, LayoutDashboard } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
 
 export default function WorkerDashboard() {
     const { user } = useAuthStore();
@@ -46,7 +47,7 @@ export default function WorkerDashboard() {
 
     if (loading) {
         return (
-            <div className="space-y-6">
+            <div className="space-y-6 container mx-auto p-6 max-w-7xl">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <Skeleton className="h-28" />
                     <Skeleton className="h-28" />
@@ -58,8 +59,12 @@ export default function WorkerDashboard() {
     }
 
     return (
-        <div className="space-y-6">
-            <h1 className="text-2xl font-bold tracking-tight">Worker Dashboard</h1>
+        <div className="space-y-6 container mx-auto p-6 max-w-7xl">
+            <PageHeader
+                title="Worker Dashboard"
+                description="Manage your assigned tasks and reports."
+                icon={LayoutDashboard}
+            />
 
             {/* Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

@@ -1,38 +1,19 @@
-'use client';
-
-// Similar to Manager overview
-import { useEffect, useState } from 'react';
+// Server Component
 import { api } from '@/mock/api';
-import { Issue } from '@/mock/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
 import { StatusBarChart, PriorityPieChart } from '@/components/manager/charts';
 import { IssuesOverviewChartWithColors } from '@/components/admin/charts';
 import { RecentIssuesTable } from '@/components/admin/recent-issues-table';
 import { ShieldAlert, Users, Building, Activity } from 'lucide-react';
 
-export default function AdminOverview() {
-    const [issues, setIssues] = useState<Issue[]>([]);
-    const [users, setUsers] = useState<any[]>([]);
-    const [projects, setProjects] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+import { PageHeader } from '@/components/ui/page-header';
 
-    useEffect(() => {
-        Promise.all([
-            api.issues.getAll(),
-            api.users.getAll(),
-            api.projects.getAll()
-        ]).then(([i, u, p]) => {
-            setIssues(i);
-            setUsers(u);
-            setProjects(p);
-            setLoading(false);
-        });
-    }, []);
-
-    if (loading) {
-        return <Skeleton className="h-96" />;
-    }
+export default async function AdminOverview() {
+    const [issues, users, projects] = await Promise.all([
+        api.issues.getAll(),
+        api.users.getAll(),
+        api.projects.getAll()
+    ]);
 
     const kpis = [
         { label: 'Total Projects', value: projects.length, icon: Building, color: 'text-blue-500' },
@@ -51,8 +32,12 @@ export default function AdminOverview() {
     ];
 
     return (
-        <div className="space-y-6">
-            <h1 className="text-2xl font-bold tracking-tight">System Overview</h1>
+        <div className="space-y-6 container mx-auto p-6 max-w-7xl">
+            <PageHeader
+                title="System Overview"
+                description="Overview of system performance and activity."
+                icon={Activity}
+            />
 
             <div className="grid gap-4 md:grid-cols-4">
                 {kpis.map((k, i) => {

@@ -1,0 +1,239 @@
+{
+  "users": [
+    {
+      "id": "u1",
+      "employee_id": "admin",
+      "full_name": "Admin User",
+      "role": "ADMIN",
+      "phone": "1234567890",
+      "password": "admin123",
+      "active": true,
+      "created_at": "2026-01-17T17:19:20.595Z",
+      "updated_at": "2026-01-17T17:19:20.595Z"
+    },
+    {
+      "id": "u2",
+      "employee_id": "manager1",
+      "full_name": "John Manager",
+      "role": "MANAGER",
+      "phone": "0987654321",
+      "password": "manager123",
+      "active": true,
+      "created_at": "2026-01-17T17:19:20.595Z",
+      "updated_at": "2026-01-17T17:19:20.595Z"
+    },
+    {
+      "id": "u3",
+      "employee_id": "guard",
+      "full_name": "Mike Worker",
+      "role": "WORKER",
+      "phone": "1122334455",
+      "password": "guard123",
+      "active": true,
+      "created_at": "2026-01-17T17:19:20.595Z",
+      "updated_at": "2026-01-17T17:19:20.595Z"
+    },
+    {
+      "id": "u4",
+      "employee_id": "owner",
+      "full_name": "Building Owner",
+      "role": "ADMIN",
+      "phone": "5555555555",
+      "password": "owner123",
+      "active": true,
+      "created_at": "2026-01-17T17:19:20.595Z",
+      "updated_at": "2026-01-17T17:19:20.595Z"
+    }
+  ],
+  "projects": [
+    {
+      "id": "p1",
+      "name": "Skyline Towers",
+      "location": "123 Main St, Metro City",
+      "created_by_user_id": "u1",
+      "created_at": "2026-01-17T17:19:20.595Z",
+      "updated_at": "2026-01-17T17:19:20.595Z"
+    },
+    {
+      "id": "p2",
+      "name": "Oasis Heights",
+      "location": "456 Palm Ave, Beach City",
+      "created_by_user_id": "u1",
+      "created_at": "2026-01-17T17:19:20.595Z",
+      "updated_at": "2026-01-17T17:19:20.595Z"
+    }
+  ],
+  "units": [
+    {
+      "id": "unit1",
+      "project_id": "p1",
+      "unit_no": "101",
+      "type": "2BHK",
+      "is_occupied": true,
+      "created_by_user_id": "u2",
+      "created_at": "2026-01-17T17:19:20.595Z",
+      "updated_at": "2026-01-17T17:19:20.595Z"
+    },
+    {
+      "id": "unit2",
+      "project_id": "p1",
+      "unit_no": "102",
+      "type": "3BHK",
+      "is_occupied": true,
+      "created_by_user_id": "u2",
+      "created_at": "2026-01-17T17:19:20.595Z",
+      "updated_at": "2026-01-17T18:16:21.832Z",
+      "current_occupant_id": "c-1768673781829"
+    },
+    {
+      "project_id": "p2",
+      "unit_no": "123",
+      "is_occupied": true,
+      "created_by_user_id": "u1",
+      "id": "unit-1768673808150u332j",
+      "created_at": "2026-01-17T18:16:48.150Z",
+      "updated_at": "2026-01-17T18:17:05.163Z",
+      "current_occupant_id": "c-1768673825160"
+    }
+  ],
+  "clients": [
+    {
+      "id": "c1",
+      "id_passport": "A1234567",
+      "name": "Alice Johnson",
+      "phone": "9876543210",
+      "created_at": "2026-01-17T17:19:20.595Z",
+      "updated_at": "2026-01-17T17:19:20.595Z"
+    },
+    {
+      "id": "c-1768673781829",
+      "name": "fghjk",
+      "id_passport": "234567",
+      "phone": "23456789",
+      "type": "TENANT",
+      "created_at": "2026-01-17T18:16:21.829Z",
+      "updated_at": "2026-01-17T18:16:21.829Z"
+    },
+    {
+      "id": "c-1768673825160",
+      "name": "xclkhui",
+      "id_passport": "1234567890",
+      "phone": "098765",
+      "type": "TENANT",
+      "created_at": "2026-01-17T18:17:05.160Z",
+      "updated_at": "2026-01-17T18:17:05.160Z"
+    }
+  ],
+  "workerAssignments": [
+    {
+      "id": "wa1",
+      "worker_user_id": "u3",
+      "project_id": "p1",
+      "assigned_by_user_id": "u2",
+      "assigned_at": "2026-01-17T17:19:20.595Z",
+      "active": true
+    }
+  ],
+  "clientAssignments": [
+    {
+      "id": "ca1",
+      "client_id": "c1",
+      "unit_id": "unit1",
+      "assigned_by_user_id": "u2",
+      "start_date": "2025-01-01",
+      "end_date": "2026-01-01",
+      "is_active": true,
+      "created_at": "2026-01-17T17:19:20.595Z",
+      "updated_at": "2026-01-17T17:19:20.595Z"
+    },
+    {
+      "id": "ca-1768673781831",
+      "client_id": "c-1768673781829",
+      "unit_id": "unit2",
+      "assigned_by_user_id": "u1",
+      "start_date": "2026-01-17T18:16:21.831Z",
+      "is_active": true,
+      "created_at": "2026-01-17T18:16:21.831Z",
+      "updated_at": "2026-01-17T18:16:21.831Z"
+    },
+    {
+      "id": "ca-1768673825161",
+      "client_id": "c-1768673825160",
+      "unit_id": "unit-1768673808150u332j",
+      "assigned_by_user_id": "u1",
+      "start_date": "2026-01-17T18:17:05.161Z",
+      "is_active": true,
+      "created_at": "2026-01-17T18:17:05.161Z",
+      "updated_at": "2026-01-17T18:17:05.161Z"
+    }
+  ],
+  "issues": [
+    {
+      "id": "i1",
+      "project_id": "p1",
+      "reported_by_user_id": "u3",
+      "location_type": "UNIT",
+      "unit_id": "unit1",
+      "issue_caused_by": "Tenant Misuse",
+      "complaint_type": "Plumbing",
+      "description_text": "Leaking faucet in kitchen",
+      "status": "OPEN",
+      "priority": "MEDIUM",
+      "approved": false,
+      "verified": false,
+      "is_actionable": true,
+      "created_at": "2026-01-16T17:19:20.595Z",
+      "updated_at": "2026-01-16T17:19:20.595Z"
+    },
+    {
+      "id": "i2",
+      "project_id": "p1",
+      "reported_by_user_id": "u3",
+      "location_type": "OTHER",
+      "other_area": "Lobby Entrance",
+      "issue_caused_by": "Wear and Tear",
+      "complaint_type": "Electrical",
+      "description_text": "Light flickering",
+      "status": "IN_PROGRESS",
+      "priority": "HIGH",
+      "assigned_vendor_name": "ElectroFix Inc.",
+      "approved": true,
+      "approved_by_user_id": "u2",
+      "verified": false,
+      "is_actionable": true,
+      "created_at": "2026-01-15T17:19:20.595Z",
+      "updated_at": "2026-01-16T17:19:20.595Z"
+    },
+    {
+      "id": "i3",
+      "project_id": "p1",
+      "reported_by_user_id": "u3",
+      "location_type": "UNIT",
+      "unit_id": "unit2",
+      "issue_caused_by": "Unknown",
+      "complaint_type": "Cleaning",
+      "description_text": "Dusty windows",
+      "status": "RESOLVED",
+      "priority": "LOW",
+      "assigned_vendor_name": "CleanCo",
+      "approved": true,
+      "approved_by_user_id": "u2",
+      "verified": false,
+      "is_actionable": true,
+      "created_at": "2026-01-14T17:19:20.595Z",
+      "updated_at": "2026-01-17T05:19:20.595Z"
+    }
+  ],
+  "attachments": [
+    {
+      "id": "att1",
+      "issue_id": "i1",
+      "url": "https://placehold.co/600x400/png?text=Leaking+Faucet",
+      "media_type": "IMAGE",
+      "proof_type": "BEFORE",
+      "created_at": "2026-01-16T17:19:20.595Z"
+    }
+  ],
+  "history": [],
+  "logs": []
+}
