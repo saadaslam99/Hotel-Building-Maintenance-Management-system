@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatusBarChart, PriorityPieChart } from '@/components/manager/charts';
 import { Briefcase, AlertCircle, CheckCircle2, Users } from 'lucide-react';
-import { format } from 'date-fns';
+
 
 export default function ManagerOverview() {
     const [issues, setIssues] = useState<Issue[]>([]);
@@ -56,7 +56,6 @@ export default function ManagerOverview() {
         { name: 'Low', value: issues.filter(i => i.priority === IssuePriority.LOW).length },
         { name: 'Medium', value: issues.filter(i => i.priority === IssuePriority.MEDIUM).length },
         { name: 'High', value: issues.filter(i => i.priority === IssuePriority.HIGH).length },
-        { name: 'Urgent', value: issues.filter(i => i.priority === IssuePriority.URGENT).length },
     ].filter(d => d.value > 0);
 
     return (

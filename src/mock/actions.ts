@@ -4,8 +4,24 @@ import { serverDb as db } from '@/lib/server-db';
 import {
     User, UserRole, Issue, IssueStatus, IssuePriority, Project,
     Unit, Client, WorkerProjectAssignment, ClientUnitAssignment,
-    LocationType, ProofType, MediaType, IssueAttachment, SystemLog, OccupantType
+    LocationType, ProofType, MediaType, IssueAttachment, SystemLog, OccupantType, IssueDetails,
+    IssueStats, IssueAuditLog
 } from '@/mock/types';
+
+// Helper to enrich issues with location display
+function enrichIssueLocations(issues: Issue[]): Issue[] {
+    const units = db.get('units');
+    return issues.map(issue => {
+        let locationDisplay = 'Unknown Location';
+        if (issue.location_type === 'UNIT') {
+            const unit = units.find(u => u.id === issue.unit_id);
+            locationDisplay = unit ? `Unit ${unit.unit_no}` : `Unit ${issue.unit_id || '?'}`;
+        } else {
+            locationDisplay = issue.other_area || 'Unknown Common Area';
+        }
+        return { ...issue, location_display: locationDisplay };
+    });
+}
 
 // Auth Actions
 export async function login(employee_id: string, password: string): Promise<{ user: User; token: string }> {
@@ -98,23 +114,80 @@ export async function assignWorker(assignment: any) {
 
 // Issue Actions
 export async function getIssues(): Promise<Issue[]> {
-    return db.get('issues');
+    return enrichIssueLocations(db.get('issues'));
 }
 export async function getIssuesByProject(projectId: string): Promise<Issue[]> {
-    return db.get('issues').filter(i => i.project_id === projectId);
+    return enrichIssueLocations(db.get('issues').filter(i => i.project_id === projectId));
 }
-export async function getIssueById(id: string): Promise<Issue | undefined> {
-    return db.find('issues', (i) => i.id === id);
+export async function getIssueById(id: string): Promise<IssueDetails | undefined> {
+    const rawIssue = db.find('issues', (i) => i.id === id);
+    if (!rawIssue) return undefined;
+
+    // Enrich single issue
+    const [enrichedIssue] = enrichIssueLocations([rawIssue]);
+
+    const project = db.find('projects', p => p.id === enrichedIssue.project_id);
+    let approvedByName: string | undefined;
+
+    if (enrichedIssue.approved && enrichedIssue.approved_by_user_id) {
+        const approver = db.find('users', u => u.id === enrichedIssue.approved_by_user_id);
+        approvedByName = approver?.full_name;
+    }
+
+    const reporter = db.find('users', u => u.id === enrichedIssue.reported_by_user_id);
+    const verifier = enrichedIssue.verified && enrichedIssue.verified_by_user_id
+        ? db.find('users', u => u.id === enrichedIssue.verified_by_user_id)
+        : undefined;
+
+    return {
+        ...enrichedIssue,
+        project_name: project?.name || 'Unknown Project',
+        approved_by_name: approvedByName,
+        reported_by_name: reporter?.full_name,
+        verified_by_name: verifier?.full_name
+    };
 }
 export async function getActiveIssues(): Promise<Issue[]> {
-    return db.get('issues').filter(i =>
+    const issues = db.get('issues').filter(i =>
         !((i.status === IssueStatus.RESOLVED && i.verified) || i.status === IssueStatus.REJECTED)
     );
+    return enrichIssueLocations(issues);
 }
 export async function getHistoryIssues(): Promise<Issue[]> {
-    return db.get('issues').filter(i =>
+    const issues = db.get('issues').filter(i =>
         (i.status === IssueStatus.RESOLVED && i.verified) || i.status === IssueStatus.REJECTED
     );
+    return enrichIssueLocations(issues);
+}
+export async function getIssueStats(): Promise<IssueStats> {
+    const issues = db.get('issues');
+
+    // "Active Issues" means all issues that are not resolved/verified and not rejected.
+    // Equivalent to getActiveIssues() filter.
+    const activeIssuesCount = issues.filter(i =>
+        !((i.status === IssueStatus.RESOLVED && i.verified) || i.status === IssueStatus.REJECTED)
+    ).length;
+
+    // "Total Resolved & Verified"
+    const resolvedAndVerifiedCount = issues.filter(i =>
+        i.status === IssueStatus.RESOLVED && i.verified
+    ).length;
+
+    const openIssues = issues.filter(i => i.status === IssueStatus.OPEN);
+
+    return {
+        totalIssues: issues.length,
+        activeIssues: activeIssuesCount,
+        resolvedAndVerifiedIssues: resolvedAndVerifiedCount,
+        openIssues: openIssues.length,
+        openByPriority: {
+            HIGH: openIssues.filter(i => i.priority === IssuePriority.HIGH).length,
+            MEDIUM: openIssues.filter(i => i.priority === IssuePriority.MEDIUM).length,
+            LOW: openIssues.filter(i => i.priority === IssuePriority.LOW).length,
+        },
+        inProgressIssues: issues.filter(i => i.status === IssueStatus.IN_PROGRESS).length,
+        awaitingVerificationIssues: issues.filter(i => i.status === IssueStatus.RESOLVED && !i.verified).length,
+    };
 }
 export async function createIssue(issue: any): Promise<Issue> {
     const newIssue = {
@@ -130,6 +203,89 @@ export async function updateIssue(id: string, updates: any): Promise<Issue> {
     if (!updated) throw new Error('Issue not found');
     return updated;
 }
+export async function adminOverride(
+    id: string,
+    adminId: string,
+    updates: { status?: IssueStatus; priority?: IssuePriority; comment?: string }
+) {
+    // 1. Check admin role
+    const admin = db.find('users', u => u.id === adminId);
+    if (!admin || admin.role !== UserRole.ADMIN) {
+        throw new Error('Unauthorized: Only admins can perform overrides.');
+    }
+
+    const issue = db.find('issues', i => i.id === id);
+    if (!issue) throw new Error('Issue not found');
+
+    // 2. Prepare changes and logs
+    const changes: Partial<Issue> = {};
+    const logDetails: any = {};
+
+    if (updates.status && updates.status !== issue.status) {
+        changes.status = updates.status;
+        logDetails.from_status = issue.status;
+        logDetails.to_status = updates.status;
+
+        // If status changed to OPEN/IN_PROGRESS from RESOLVED/VERIFIED/REJECTED,
+        // we might want to unset verification/approval flags?
+        // User said: "Preserve Existing Workflow Data... Do NOT delete... If needed mark as superseded".
+        // For simplicity and matching req "Admin can set it back", we just change status.
+        // We will verify flags loosely in UI or just keep them as history.
+        // If moving OUT of verified, we unset the verified *boolean* so it appears active again?
+        // Let's unset the 'verified' boolean if status is NOT resolved.
+        if (updates.status !== IssueStatus.RESOLVED && issue.verified) {
+            changes.verified = false; // Supersede verification
+        }
+        // Assuming 'approved' remains true if it was approved, or we can reset it?
+        // Requirement: "Admin can set it back to OPEN".
+        // If OPEN, it implies not approved yet or re-opened?
+        // Let's reset flags if going to OPEN.
+        if (updates.status === IssueStatus.OPEN) {
+            changes.approved = false;
+            changes.verified = false;
+        }
+    }
+
+    if (updates.priority && updates.priority !== issue.priority) {
+        changes.priority = updates.priority;
+        logDetails.from_priority = issue.priority;
+        logDetails.to_priority = updates.priority;
+    }
+
+    if (Object.keys(changes).length === 0) return issue; // No changes
+
+    // 3. Update Issue
+    const updatedIssue = db.update('issues', id, {
+        ...changes,
+        updated_at: new Date().toISOString()
+    });
+
+    // 4. Create Audit Log
+    const auditLog: IssueAuditLog = {
+        id: 'log-' + Date.now(),
+        issue_id: id,
+        action: 'OVERRIDE',
+        details: logDetails,
+        changed_by_user_id: adminId,
+        comment: updates.comment,
+        created_at: new Date().toISOString()
+    };
+    db.create('auditLogs', auditLog);
+
+    return updatedIssue;
+}
+export async function getIssueAuditLogs(issueId: string) {
+    const logs = db.get('auditLogs').filter((l: any) => l.issue_id === issueId);
+    // Enrich with user names
+    return logs.map((log: any) => {
+        const user = db.find('users', u => u.id === log.changed_by_user_id);
+        return {
+            ...log,
+            changed_by_name: user?.full_name || 'Unknown User'
+        };
+    }).sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+}
+
 export async function getAttachments(issueId: string) {
     return db.get('attachments').filter(a => a.issue_id === issueId);
 }

@@ -86,7 +86,7 @@ export default function WorkVerificationPage() {
                             <CardContent className="pb-2 text-sm text-slate-600 space-y-2">
                                 <div className="flex items-center gap-2">
                                     <MapPin className="h-4 w-4" />
-                                    <span>{issue.location_type === 'UNIT' ? `Unit ${issue.unit_id}` : issue.other_area}</span>
+                                    <span>{issue.location_display}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <Camera className="h-4 w-4" />

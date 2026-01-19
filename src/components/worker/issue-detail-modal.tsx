@@ -68,7 +68,7 @@ export function IssueDetailModal({ issue, open, onOpenChange }: IssueDetailModal
                                 <div>
                                     <span className="font-semibold text-muted-foreground">Location:</span>
                                     <div className="font-medium">
-                                        {issue.location_type === 'UNIT' ? `Unit ${issue.unit_id}` : issue.other_area}
+                                        {issue.location_display}
                                     </div>
                                 </div>
                             </div>

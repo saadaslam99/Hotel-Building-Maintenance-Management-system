@@ -18,7 +18,7 @@ export default function ReportsPage() {
     const downloadCSV = () => {
         // Mock download
         const header = ['ID,Type,Location,Status,Priority,Date'];
-        const rows = issues.map(i => `${i.id},${i.complaint_type},${i.location_type},${i.status},${i.priority},${i.created_at}`);
+        const rows = issues.map(i => `${i.id},${i.complaint_type},${i.location_display || i.location_type},${i.status},${i.priority},${i.created_at}`);
         const csvContent = "data:text/csv;charset=utf-8," + [header, ...rows].join('\n');
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
@@ -38,7 +38,6 @@ export default function ReportsPage() {
     const priorityData = [
         { name: 'Low', value: issues.filter(i => i.priority === 'LOW').length },
         { name: 'High', value: issues.filter(i => i.priority === 'HIGH').length },
-        { name: 'Urgent', value: issues.filter(i => i.priority === 'URGENT').length },
     ].filter(d => d.value > 0);
 
     return (

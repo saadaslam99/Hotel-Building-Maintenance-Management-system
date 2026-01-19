@@ -10,9 +10,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { Archive, CheckCircle, XCircle, Clock, Eye } from 'lucide-react';
+import { IssueActionDrawer } from '@/components/manager/issue-action-drawer';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 const IssueTable = ({ issues, emptyMessage, handleViewDetails }: { issues: Issue[], emptyMessage: string, handleViewDetails: (issue: Issue) => void }) => (
     <Table>
@@ -39,7 +38,7 @@ const IssueTable = ({ issues, emptyMessage, handleViewDetails }: { issues: Issue
                         <TableCell className="font-mono text-xs">#{issue.id.slice(-4)}</TableCell>
                         <TableCell className="font-medium">{issue.complaint_type}</TableCell>
                         <TableCell>
-                            <Badge variant="outline" className="text-xs">{issue.location_type}</Badge>
+                            <Badge variant="outline" className="text-xs">{issue.location_display}</Badge>
                         </TableCell>
                         <TableCell>
                             {issue.status === IssueStatus.RESOLVED && issue.verified ? (
@@ -152,82 +151,18 @@ export default function HistoryPage() {
                 </TabsContent>
             </Tabs>
 
-            {/* Detail View Sheet */}
-            <Sheet open={detailOpen} onOpenChange={setDetailOpen}>
-                <SheetContent className="w-[450px] sm:w-[540px]">
-                    <SheetHeader>
-                        <SheetTitle>Issue Details #{selectedIssue?.id.slice(-4)}</SheetTitle>
-                        <SheetDescription>
-                            Archived on {selectedIssue && format(new Date(selectedIssue.updated_at), 'PPP')}
-                        </SheetDescription>
-                    </SheetHeader>
-                    <ScrollArea className="h-[calc(100vh-150px)] mt-6">
-                        {selectedIssue && (
-                            <div className="space-y-6 pr-4">
-                                <div className="space-y-2">
-                                    <div className="flex gap-2">
-                                        <Badge variant="outline">{selectedIssue.location_type}</Badge>
-                                        {selectedIssue.status === IssueStatus.RESOLVED && selectedIssue.verified ? (
-                                            <Badge className="bg-green-500/10 text-green-600 dark:text-green-400">Resolved & Verified</Badge>
-                                        ) : (
-                                            <Badge variant="destructive" className="bg-destructive/10 text-destructive border-destructive/20">Rejected</Badge>
-                                        )}
-                                    </div>
-                                    <h3 className="font-semibold text-lg">{selectedIssue.complaint_type}</h3>
-                                    <p className="text-sm text-muted-foreground">{selectedIssue.description_text}</p>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4 bg-muted/40 p-4 rounded-lg border">
-                                    <div>
-                                        <span className="text-xs text-muted-foreground uppercase">Caused By</span>
-                                        <div className="font-medium text-sm">{selectedIssue.issue_caused_by}</div>
-                                    </div>
-                                    <div>
-                                        <span className="text-xs text-muted-foreground uppercase">Priority</span>
-                                        <div className="font-medium text-sm">{selectedIssue.priority || '-'}</div>
-                                    </div>
-                                    <div>
-                                        <span className="text-xs text-muted-foreground uppercase">Assigned Vendor</span>
-                                        <div className="font-medium text-sm">{selectedIssue.assigned_vendor_name || '-'}</div>
-                                    </div>
-                                    <div>
-                                        <span className="text-xs text-muted-foreground uppercase">Reporter</span>
-                                        <div className="font-medium text-sm">User {selectedIssue.reported_by_user_id}</div>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <h4 className="font-medium flex items-center gap-2">
-                                        <Clock className="h-4 w-4" /> Timeline
-                                    </h4>
-                                    <div className="space-y-2 text-sm">
-                                        <div className="flex justify-between py-2 border-b">
-                                            <span className="text-muted-foreground">Created</span>
-                                            <span>{format(new Date(selectedIssue.created_at), 'PPp')}</span>
-                                        </div>
-                                        <div className="flex justify-between py-2 border-b">
-                                            <span className="text-muted-foreground">Last Updated</span>
-                                            <span>{format(new Date(selectedIssue.updated_at), 'PPp')}</span>
-                                        </div>
-                                        {selectedIssue.verified_at && (
-                                            <div className="flex justify-between py-2 border-b">
-                                                <span className="text-muted-foreground">Verified At</span>
-                                                <span>{format(new Date(selectedIssue.verified_at), 'PPp')}</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className="p-4 bg-amber-500/5 rounded-lg border border-amber-500/20">
-                                    <p className="text-sm text-amber-600 dark:text-amber-500">
-                                        <strong>Note:</strong> This is a read-only view. Archived issues cannot be modified or deleted.
-                                    </p>
-                                </div>
-                            </div>
-                        )}
-                    </ScrollArea>
-                </SheetContent>
-            </Sheet>
+            {/* Detail View Drawer */}
+            <IssueActionDrawer
+                issue={selectedIssue}
+                open={detailOpen}
+                onOpenChange={setDetailOpen}
+                onUpdate={() => {
+                    api.issues.getHistory().then((issues) => {
+                        setHistoryIssues(issues);
+                        setLoading(false);
+                    });
+                }}
+            />
         </div>
     );
 }

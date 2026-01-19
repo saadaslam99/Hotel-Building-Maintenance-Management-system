@@ -26,8 +26,7 @@ export function IssueCard({ issue, onView }: IssueCardProps) {
 
     const getPriorityColor = (priority?: IssuePriority) => {
         switch (priority) {
-            case IssuePriority.URGENT: return 'text-red-500 border-red-200 bg-red-50';
-            case IssuePriority.HIGH: return 'text-orange-500 border-orange-200 bg-orange-50';
+            case IssuePriority.HIGH: return 'text-red-500 border-red-200 bg-red-50';
             case IssuePriority.MEDIUM: return 'text-blue-500 border-blue-200 bg-blue-50';
             case IssuePriority.LOW: return 'text-slate-500 border-slate-200 bg-slate-50';
             default: return 'text-slate-500';
@@ -53,15 +52,7 @@ export function IssueCard({ issue, onView }: IssueCardProps) {
                 <div className="flex items-center gap-2">
                     <MapPin className="h-4 w-4" />
                     <span>
-                        {issue.location_type === 'UNIT' ? `Unit ${issue.unit_id || '?'}` : issue.other_area}
-                        {/* Note: unit_no isn't on Issue, Issue has unit_id. We need to fetch unit or just show ID for mock speed. 
-                  Actually I should join data. For now, showing raw or simple. 
-                  Wait, issue.unit_id is ID. I need to fetch unit info. 
-                  I'll fix this in the parent or just show static for now. 
-                  Actually, Issue interface in types.ts doesn't have unit_no. 
-                  I will fetch full details in parent and pass down, or just show ID. 
-              */}
-                        {issue.location_type === 'UNIT' ? ` (Unit)` : ''}
+                        {issue.location_display}
                     </span>
                 </div>
                 <div className="flex items-center gap-2">

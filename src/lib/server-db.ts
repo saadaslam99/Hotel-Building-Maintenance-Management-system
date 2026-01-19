@@ -2,8 +2,9 @@ import fs from 'fs';
 import path from 'path';
 import {
     User, Project, Unit, Client, WorkerProjectAssignment, ClientUnitAssignment,
-    Issue, IssueAttachment, IssueStatusHistory, SystemLog
+    Issue, IssueAttachment, IssueStatusHistory, SystemLog, IssueAuditLog
 } from '@/mock/types';
+
 import {
     SEED_USERS, SEED_PROJECTS, SEED_UNITS, SEED_CLIENTS,
     SEED_WORKER_ASSIGNMENTS, SEED_CLIENT_ASSIGNMENTS, SEED_ISSUES, SEED_ATTACHMENTS
@@ -21,6 +22,7 @@ export interface MockSchema {
     attachments: IssueAttachment[];
     history: IssueStatusHistory[];
     logs: SystemLog[];
+    auditLogs: IssueAuditLog[];
 }
 
 // Initial Data
@@ -35,6 +37,7 @@ const INITIAL_DB: MockSchema = {
     attachments: SEED_ATTACHMENTS,
     history: [],
     logs: [],
+    auditLogs: [],
 };
 
 // JSON file path (project root)
@@ -49,7 +52,19 @@ function readDb(): MockSchema {
             return INITIAL_DB;
         }
         const data = fs.readFileSync(DB_FILE, 'utf-8');
-        return JSON.parse(data);
+        const parsed = JSON.parse(data);
+
+        // MIGRATION: Convert URGENT to HIGH
+        if (parsed.issues) {
+            parsed.issues = parsed.issues.map((i: any) => {
+                if (i.priority === 'URGENT') {
+                    return { ...i, priority: 'HIGH' };
+                }
+                return i;
+            });
+        }
+
+        return { ...INITIAL_DB, ...parsed };
     } catch (error) {
         console.error('Error reading DB:', error);
         return INITIAL_DB;

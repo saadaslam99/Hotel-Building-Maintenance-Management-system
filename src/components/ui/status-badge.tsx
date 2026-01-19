@@ -28,8 +28,7 @@ const STATUS_MAP: Record<string, StatusIntent> = {
     // Priority
     'LOW': 'neutral',
     'MEDIUM': 'info',
-    'HIGH': 'warning',
-    'URGENT': 'error',
+    'HIGH': 'error',
     // General
     'Active': 'success',
     'Inactive': 'neutral',

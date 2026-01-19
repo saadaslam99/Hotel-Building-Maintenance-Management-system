@@ -20,12 +20,12 @@ export enum IssuePriority {
   LOW = 'LOW',
   MEDIUM = 'MEDIUM',
   HIGH = 'HIGH',
-  URGENT = 'URGENT',
 }
 
 export enum ProofType {
   BEFORE = 'BEFORE',
   AFTER = 'AFTER',
+  VERIFICATION = 'VERIFICATION',
 }
 
 export enum MediaType {
@@ -143,15 +143,43 @@ export interface Issue {
 
   approved: boolean;
   approved_by_user_id?: string;
+  approved_at?: string; // ISO string
+  approval_note?: string;
 
   verified: boolean;
-  verified_at?: string;
   verified_by_user_id?: string;
+  verified_at?: string; // ISO string
+  verification_comment?: string;
+  rejection_reason?: string;
+
+  // Computed/Enriched
+  location_display?: string;
 
   is_actionable: boolean; // Computed helper or stored? "verified=false" AND "status=RESOLVED" implies actionable for manager? Request says "TOTAL_ACTIONABLE" stats.
 
   created_at: string;
   updated_at: string;
+}
+
+export interface IssueDetails extends Issue {
+  project_name: string;
+  approved_by_name?: string;
+  reported_by_name?: string;
+  verified_by_name?: string;
+}
+
+export interface IssueStats {
+  totalIssues: number;
+  activeIssues: number;
+  resolvedAndVerifiedIssues: number;
+  openIssues: number;
+  openByPriority: {
+    HIGH: number;
+    MEDIUM: number;
+    LOW: number;
+  };
+  inProgressIssues: number;
+  awaitingVerificationIssues: number;
 }
 
 export interface SystemLog {
@@ -161,5 +189,20 @@ export interface SystemLog {
   entity_id: string;
   performed_by_user_id: string;
   details?: string;
+  created_at: string;
+}
+export interface IssueAuditLog {
+  id: string;
+  issue_id: string;
+  action: 'OVERRIDE' | 'STATUS_CHANGE' | 'PRIORITY_CHANGE';
+  details: {
+    from_status?: string;
+    to_status?: string;
+    from_priority?: string;
+    to_priority?: string;
+  };
+  changed_by_user_id: string;
+  changed_by_name?: string; // Enriched
+  comment?: string;
   created_at: string;
 }

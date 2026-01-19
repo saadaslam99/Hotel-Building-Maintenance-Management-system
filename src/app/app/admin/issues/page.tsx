@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/mock/api';
-import { Issue, IssueStatus, Project } from '@/mock/types';
+import { Issue, Project, IssueStats } from '@/mock/types';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -11,26 +11,36 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { IssueActionDrawer } from '@/components/manager/issue-action-drawer';
 import { format } from 'date-fns';
-import { ListTodo, Archive, Eye } from 'lucide-react';
+import { ListTodo, Archive, Eye, RefreshCw, FileText, AlertCircle, Hammer, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 import { PageHeader } from '@/components/ui/page-header';
 import { StatusBadge } from '@/components/ui/status-badge';
 
 export default function AdminIssuesPage() {
     const [issues, setIssues] = useState<Issue[]>([]);
+    const [stats, setStats] = useState<IssueStats | null>(null);
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
     const [drawerOpen, setDrawerOpen] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
     const fetchIssues = async () => {
-        const [issuesData, projectsData] = await Promise.all([
+        const [issuesData, projectsData, statsData] = await Promise.all([
             api.issues.getActive(),
-            api.projects.getAll()
+            api.projects.getAll(),
+            api.issues.getStats()
         ]);
         setIssues(issuesData);
         setProjects(projectsData);
+        setStats(statsData);
         setLoading(false);
+    };
+
+    const handleRefresh = async () => {
+        setIsRefreshing(true);
+        await fetchIssues();
+        setIsRefreshing(false);
     };
 
     useEffect(() => {
@@ -46,15 +56,9 @@ export default function AdminIssuesPage() {
         return projects.find(p => p.id === projectId)?.name || 'Unknown Project';
     };
 
-    if (loading) {
+    if (loading || !stats) {
         return <Skeleton className="h-96" />;
     }
-
-    const stats = {
-        open: issues.filter(i => i.status === IssueStatus.OPEN).length,
-        inProgress: issues.filter(i => i.status === IssueStatus.IN_PROGRESS).length,
-        resolved: issues.filter(i => i.status === IssueStatus.RESOLVED && !i.verified).length,
-    };
 
     return (
         <div className="space-y-6 container mx-auto p-6 max-w-7xl">
@@ -74,41 +78,84 @@ export default function AdminIssuesPage() {
             <div className="grid gap-4 md:grid-cols-4">
                 <Card>
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">Total Active</CardTitle>
+                        <CardTitle className="text-sm font-medium flex items-center gap-2">
+                            <FileText className="h-4 w-4 text-muted-foreground" />
+                            Total Issues
+                        </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{issues.length}</div>
+                        <div className="flex flex-col gap-1.5">
+                            <div className="flex justify-between items-center text-sm">
+                                <span className="text-muted-foreground">Active Issues:</span>
+                                <span className="font-bold">{stats.activeIssues}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-sm">
+                                <span className="text-muted-foreground">Total Resolved & Verified:</span>
+                                <span className="font-bold">{stats.resolvedAndVerifiedIssues}</span>
+                            </div>
+                        </div>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-yellow-600 dark:text-yellow-500">Open</CardTitle>
+                        <CardTitle className="text-sm font-medium text-yellow-600 dark:text-yellow-500 flex items-center gap-2">
+                            <AlertCircle className="h-4 w-4" />
+                            Open
+                        </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-500">{stats.open}</div>
+                        <div className="flex flex-col gap-1.5">
+                            <div className="flex justify-between items-center text-sm">
+                                <span className="text-muted-foreground">High Priority:</span>
+                                <span className="font-bold">{stats.openByPriority.HIGH || 0}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-sm">
+                                <span className="text-muted-foreground">Medium Priority:</span>
+                                <span className="font-bold">{stats.openByPriority.MEDIUM || 0}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-sm">
+                                <span className="text-muted-foreground">Low Priority:</span>
+                                <span className="font-bold">{stats.openByPriority.LOW || 0}</span>
+                            </div>
+                        </div>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-blue-600 dark:text-blue-500">In Progress</CardTitle>
+                        <CardTitle className="text-sm font-medium text-blue-600 dark:text-blue-500 flex items-center gap-2">
+                            <Hammer className="h-4 w-4" />
+                            In Progress
+                        </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-blue-600 dark:text-blue-500">{stats.inProgress}</div>
+                        <div className="text-2xl font-bold text-blue-600 dark:text-blue-500">{stats.inProgressIssues}</div>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-green-600 dark:text-green-500">Awaiting Verification</CardTitle>
+                        <CardTitle className="text-sm font-medium text-green-600 dark:text-green-500 flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4" />
+                            Awaiting Verification
+                        </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-green-600 dark:text-green-500">{stats.resolved}</div>
+                        <div className="text-2xl font-bold text-green-600 dark:text-green-500">{stats.awaitingVerificationIssues}</div>
                     </CardContent>
                 </Card>
             </div>
 
             <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle>All Active Issues</CardTitle>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleRefresh}
+                        disabled={isRefreshing || loading}
+                    >
+                        <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        Fetch Issues
+                    </Button>
                 </CardHeader>
                 <CardContent className="p-0">
                     <Table>
@@ -138,7 +185,7 @@ export default function AdminIssuesPage() {
                                         <TableCell className="font-medium">{getProjectName(issue.project_id)}</TableCell>
                                         <TableCell className="font-medium">{issue.complaint_type}</TableCell>
                                         <TableCell>
-                                            <Badge variant="outline" className="text-xs">{issue.location_type}</Badge>
+                                            <Badge variant="outline" className="text-xs">{issue.location_display}</Badge>
                                         </TableCell>
                                         <TableCell>
                                             <StatusBadge status={issue.priority || 'MEDIUM'} />

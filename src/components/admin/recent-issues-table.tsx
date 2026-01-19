@@ -1,9 +1,8 @@
 'use client';
 
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Issue, Project, IssueStatus, IssuePriority } from '@/mock/types';
+import { Issue, Project } from '@/mock/types';
 import { formatDistanceToNow } from 'date-fns';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
@@ -14,7 +13,22 @@ interface RecentIssuesTableProps {
     projects: Project[];
 }
 
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { RefreshCw } from 'lucide-react';
+
 export function RecentIssuesTable({ issues, projects }: RecentIssuesTableProps) {
+    const router = useRouter();
+    const [isRefreshing, setIsRefreshing] = useState(false);
+
+    const handleRefresh = () => {
+        setIsRefreshing(true);
+        router.refresh();
+        // Simulate a short delay for visual feedback since router.refresh is async but doesn't return a promise
+        setTimeout(() => setIsRefreshing(false), 1000);
+    };
+
     // Sort by created_at desc and take top 5
     const recentIssues = [...issues]
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
@@ -27,7 +41,19 @@ export function RecentIssuesTable({ issues, projects }: RecentIssuesTableProps) 
     return (
         <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Recent Issues</CardTitle>
+                <div className="flex items-center gap-4">
+                    <CardTitle>Recent Issues</CardTitle>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleRefresh}
+                        disabled={isRefreshing}
+                        className="h-8 px-2 text-xs text-muted-foreground hover:text-primary"
+                    >
+                        <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        Fetch Issues
+                    </Button>
+                </div>
                 <Link href="/app/admin/issues" className="text-sm text-muted-foreground hover:text-primary flex items-center gap-1">
                     View All Issues <ArrowRight className="h-4 w-4" />
                 </Link>

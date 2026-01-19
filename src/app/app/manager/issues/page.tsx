@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { format } from 'date-fns';
-import { Loader2, Search, Filter } from 'lucide-react';
+import { Loader2, Search } from 'lucide-react';
 
 export default function ManagerIssuesPage() {
     const [issues, setIssues] = useState<Issue[]>([]);
@@ -50,7 +50,7 @@ export default function ManagerIssuesPage() {
                 i.complaint_type.toLowerCase().includes(q) ||
                 i.description_text?.toLowerCase().includes(q) ||
                 i.issue_caused_by.toLowerCase().includes(q) ||
-                i.location_type.toLowerCase().includes(q)
+                i.location_display?.toLowerCase().includes(q)
             );
         }
 
@@ -125,7 +125,6 @@ export default function ManagerIssuesPage() {
                             <SelectItem value={IssuePriority.LOW}>Low</SelectItem>
                             <SelectItem value={IssuePriority.MEDIUM}>Medium</SelectItem>
                             <SelectItem value={IssuePriority.HIGH}>High</SelectItem>
-                            <SelectItem value={IssuePriority.URGENT}>Urgent</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
@@ -169,7 +168,7 @@ export default function ManagerIssuesPage() {
                                             <div className="text-xs text-muted-foreground">{issue.issue_caused_by}</div>
                                         </TableCell>
                                         <TableCell>
-                                            {issue.location_type === 'UNIT' ? `Unit ${issue.unit_id}` : issue.other_area}
+                                            {issue.location_display}
                                         </TableCell>
                                         <TableCell>
                                             <Badge className={getStatusColor(issue.status)}>{issue.status.replace('_', ' ')}</Badge>

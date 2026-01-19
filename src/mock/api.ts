@@ -1,9 +1,6 @@
 import * as actions from './actions';
-import {
-    User, UserRole, Issue, IssueStatus, IssuePriority, Project,
-    Unit, Client, WorkerProjectAssignment, ClientUnitAssignment,
-    LocationType, ProofType, MediaType, IssueAttachment, SystemLog, OccupantType
-} from './types';
+// Types are imported for side-effects or if needed, but here we just export actions wrapper
+// import { ... } from './types';
 
 // Client-side API wrapper that calls Server Actions
 // This ensures 'api.auth.login' works in Client Components
@@ -30,6 +27,9 @@ export const api = {
         update: actions.updateIssue,
         getAttachments: actions.getAttachments,
         addAttachment: actions.addAttachment,
+        getStats: actions.getIssueStats,
+        adminOverride: actions.adminOverride,
+        getAuditLogs: actions.getIssueAuditLogs,
     },
     users: {
         getAll: actions.getUsers,
