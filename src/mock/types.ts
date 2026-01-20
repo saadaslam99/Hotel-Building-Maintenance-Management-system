@@ -65,16 +65,10 @@ export interface WorkerProjectAssignment {
   ended_at?: string;
 }
 
-export enum OccupantType {
-  TENANT = 'TENANT',
-  GUEST = 'GUEST',
-  STAFF = 'STAFF',
-}
 
 export interface Client {
   id: string;
   id_passport: string; // Qatar ID or Passport
-  type: OccupantType;
   name: string;
   phone?: string;
   created_at: string;
@@ -132,6 +126,8 @@ export interface Issue {
   unit_id?: string;
   other_area?: string;
   issue_caused_by: string;
+  other_issue_cause_description?: string; // New field for "Other" cause
+
   complaint_type: string;
   description_text?: string;
   voice_url?: string;

@@ -4,9 +4,10 @@ import { serverDb as db } from '@/lib/server-db';
 import {
     User, UserRole, Issue, IssueStatus, IssuePriority, Project,
     Unit, Client, WorkerProjectAssignment, ClientUnitAssignment,
-    LocationType, ProofType, MediaType, IssueAttachment, SystemLog, OccupantType, IssueDetails,
+    LocationType, ProofType, MediaType, IssueAttachment, SystemLog, IssueDetails,
     IssueStats, IssueAuditLog
 } from '@/mock/types';
+
 
 // Helper to enrich issues with location display
 function enrichIssueLocations(issues: Issue[]): Issue[] {
@@ -54,7 +55,15 @@ export async function createProject(project: Omit<Project, 'id' | 'created_at' |
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
     };
-    return db.create('projects', newProject);
+    const created = db.create('projects', newProject);
+    createLog({
+        action: 'CREATE_PROJECT',
+        entity_type: 'PROJECT',
+        entity_id: created.id,
+        performed_by_user_id: project.created_by_user_id,
+        details: `Project "${created.name}" created`
+    });
+    return created;
 }
 export async function addUnit(unit: Omit<Unit, 'id' | 'created_at' | 'updated_at'>, occupantDetails?: any) {
     const newUnit: Unit = {
@@ -74,7 +83,6 @@ export async function addUnit(unit: Omit<Unit, 'id' | 'created_at' | 'updated_at
                 name: occupantDetails.name,
                 id_passport: occupantDetails.id_passport,
                 phone: occupantDetails.phone,
-                type: occupantDetails.type,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
             };
@@ -83,9 +91,9 @@ export async function addUnit(unit: Omit<Unit, 'id' | 'created_at' | 'updated_at
             db.update('clients', occupant.id, {
                 name: occupantDetails.name,
                 phone: occupantDetails.phone,
-                type: occupantDetails.type,
                 updated_at: new Date().toISOString()
             });
+
         }
         const newAssign = {
             id: 'ca-' + Date.now(),
@@ -100,16 +108,45 @@ export async function addUnit(unit: Omit<Unit, 'id' | 'created_at' | 'updated_at
         db.create('clientAssignments', newAssign);
         newUnit.current_occupant_id = occupant.id;
     }
-    return db.create('units', newUnit);
+    const createdUnit = db.create('units', newUnit);
+    createLog({
+        action: 'ADD_UNIT',
+        entity_type: 'UNIT',
+        entity_id: createdUnit.id,
+        performed_by_user_id: unit.created_by_user_id,
+        details: `Unit "${createdUnit.unit_no}" added`
+    });
+    return createdUnit;
 }
 export async function assignWorker(assignment: any) {
+    // 1. Deactivate existing assignments for this worker
+    const existingAssignments = db.get('workerAssignments').filter(
+        (a: any) => a.worker_user_id === assignment.worker_user_id && a.active
+    );
+
+    existingAssignments.forEach((existing) => {
+        db.update('workerAssignments', existing.id, {
+            active: false,
+            ended_at: new Date().toISOString()
+        });
+    });
+
+    // 2. Create new active assignment
     const newAssignment = {
         ...assignment,
         id: 'wpa-' + Date.now() + Math.random().toString(36).substr(2, 5),
         assigned_at: new Date().toISOString(),
         active: true,
     };
-    return db.create('workerAssignments', newAssignment);
+    const createdAssign = db.create('workerAssignments', newAssignment);
+    createLog({
+        action: 'ASSIGN_WORKER',
+        entity_type: 'WORKER_ASSIGNMENT',
+        entity_id: createdAssign.id,
+        performed_by_user_id: assignment.assigned_by_user_id,
+        details: `Worker assigned to project`
+    });
+    return createdAssign;
 }
 
 // Issue Actions
@@ -196,7 +233,15 @@ export async function createIssue(issue: any): Promise<Issue> {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
     };
-    return db.create('issues', newIssue);
+    const createdIssue = db.create('issues', newIssue);
+    createLog({
+        action: 'CREATE_ISSUE',
+        entity_type: 'ISSUE',
+        entity_id: createdIssue.id,
+        performed_by_user_id: issue.reported_by_user_id,
+        details: `Issue reported: ${createdIssue.complaint_type}`
+    });
+    return createdIssue;
 }
 export async function updateIssue(id: string, updates: any): Promise<Issue> {
     const updated = db.update('issues', id, { ...updates, updated_at: new Date().toISOString() });
@@ -302,8 +347,31 @@ export async function addAttachment(attachment: any) {
 export async function getUsers(): Promise<User[]> {
     return db.get('users');
 }
-export async function getWorkers(): Promise<User[]> {
-    return db.get('users').filter(u => u.role === UserRole.WORKER);
+export async function getWorkers(): Promise<any[]> {
+    const workers = db.get('users').filter(u => u.role === UserRole.WORKER);
+    const assignments = db.get('workerAssignments');
+    const projects = db.get('projects');
+
+    return workers.map((worker) => {
+        const activeAssignment = assignments.find(
+            (a: any) => a.worker_user_id === worker.id && a.active
+        );
+        let project_name = 'Not Assigned';
+        let project_id = undefined;
+
+        if (activeAssignment) {
+            const project = projects.find(p => p.id === activeAssignment.project_id);
+            if (project) {
+                project_name = project.name;
+                project_id = project.id;
+            }
+        }
+        return {
+            ...worker,
+            project_name,
+            project_id
+        };
+    });
 }
 export async function getManagers(): Promise<User[]> {
     return db.get('users').filter(u => u.role === UserRole.MANAGER);
@@ -318,10 +386,29 @@ export async function createUser(user: any): Promise<User> {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
     };
-    return db.create('users', newUser);
+    const createdUser = db.create('users', newUser);
+    // Assuming created by Admin (hard to know ID here without passing it, using 'ADMIN' for now)
+    createLog({
+        action: 'CREATE_USER',
+        entity_type: 'USER',
+        entity_id: createdUser.id,
+        performed_by_user_id: 'ADMIN',
+        details: `User "${createdUser.full_name}" created`
+    });
+    return createdUser;
 }
 export async function updateUser(id: string, updates: any) {
-    return db.update('users', id, updates) as User;
+    const updatedUser = db.update('users', id, updates) as User;
+    if (updatedUser) {
+        createLog({
+            action: 'UPDATE_USER',
+            entity_type: 'USER',
+            entity_id: id,
+            performed_by_user_id: 'ADMIN',
+            details: `User "${updatedUser.full_name}" updated`
+        });
+    }
+    return updatedUser;
 }
 export async function deactivateUser(id: string, reason?: string) {
     const updated = db.update('users', id, {
@@ -330,6 +417,15 @@ export async function deactivateUser(id: string, reason?: string) {
         updated_at: new Date().toISOString()
     });
     if (!updated) throw new Error('User not found');
+
+    createLog({
+        action: 'DEACTIVATE_USER',
+        entity_type: 'USER',
+        entity_id: id,
+        performed_by_user_id: 'ADMIN',
+        details: `User deactivated: ${reason}`
+    });
+
     return updated as User;
 }
 export async function reactivateUser(id: string) {
@@ -339,6 +435,15 @@ export async function reactivateUser(id: string) {
         updated_at: new Date().toISOString()
     });
     if (!updated) throw new Error('User not found');
+
+    createLog({
+        action: 'REACTIVATE_USER',
+        entity_type: 'USER',
+        entity_id: id,
+        performed_by_user_id: 'ADMIN',
+        details: `User reactivated`
+    });
+
     return updated as User;
 }
 
@@ -368,6 +473,15 @@ export async function updateUnitStatus(unitId: string, isOccupied: boolean, occu
             current_occupant_id: undefined,
             updated_at: new Date().toISOString()
         });
+
+        createLog({
+            action: 'VACATE_UNIT',
+            entity_type: 'UNIT',
+            entity_id: unitId,
+            performed_by_user_id: 'ADMIN', // Vacating usually done by admin/manager
+            details: `Unit "${updated?.unit_no}" vacated`
+        });
+
         return updated!;
     }
 
@@ -381,7 +495,6 @@ export async function updateUnitStatus(unitId: string, isOccupied: boolean, occu
             name: occupantDetails.name,
             id_passport: occupantDetails.id_passport,
             phone: occupantDetails.phone,
-            type: occupantDetails.type,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
         };
@@ -390,9 +503,9 @@ export async function updateUnitStatus(unitId: string, isOccupied: boolean, occu
         db.update('clients', occupant.id, {
             name: occupantDetails.name,
             phone: occupantDetails.phone,
-            type: occupantDetails.type,
             updated_at: new Date().toISOString()
         });
+
     }
 
     const newAssign = {
@@ -412,6 +525,15 @@ export async function updateUnitStatus(unitId: string, isOccupied: boolean, occu
         current_occupant_id: occupant.id,
         updated_at: new Date().toISOString()
     });
+
+    createLog({
+        action: 'OCCUPY_UNIT',
+        entity_type: 'UNIT',
+        entity_id: unitId,
+        performed_by_user_id: occupantDetails.assigned_by_user_id,
+        details: `Unit "${updated?.unit_no}" occupied by ${occupant.name}`
+    });
+
     return updated!;
 }
 
@@ -424,6 +546,25 @@ export async function getUnitHistory(unitId: string) {
 }
 
 // Occupant Actions
+export async function getOccupant(id: string) {
+    return db.find('clients', c => c.id === id);
+}
+
+export async function updateOccupant(id: string, updates: any) {
+    const updated = db.update('clients', id, { ...updates, updated_at: new Date().toISOString() });
+    if (!updated) throw new Error('Occupant not found');
+
+    createLog({
+        action: 'UPDATE_OCCUPANT',
+        entity_type: 'CLIENT',
+        entity_id: id,
+        performed_by_user_id: 'ADMIN',
+        details: `Occupant "${updated.name}" details updated`
+    });
+
+    return updated;
+}
+
 export async function searchOccupants(query: string) {
     const lowerQ = query.toLowerCase();
     return db.get('clients').filter(c =>

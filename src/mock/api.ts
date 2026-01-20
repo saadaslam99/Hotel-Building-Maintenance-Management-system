@@ -47,6 +47,8 @@ export const api = {
         getHistory: actions.getUnitHistory,
     },
     occupants: {
+        getById: actions.getOccupant,
+        update: actions.updateOccupant,
         search: actions.searchOccupants,
         getAllActive: actions.getAllActiveOccupants,
     },

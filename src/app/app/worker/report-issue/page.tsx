@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import Image from 'next/image';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -17,7 +17,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { toast } from 'sonner';
-import { Loader2, Mic, Square, Trash2 } from 'lucide-react';
+import { Loader2, Mic, Trash2 } from 'lucide-react';
 
 const formSchema = z.object({
     projectId: z.string().min(1),
@@ -26,18 +26,22 @@ const formSchema = z.object({
     otherArea: z.string().optional(),
     otherAreaDetails: z.string().optional(), // New field for "Other" details
     issueCausedBy: z.string().min(1, 'Please specify cause'),
+    otherIssueCauseDescription: z.string().optional(),
     complaintType: z.string().min(1, 'Please select type'),
     otherComplaintType: z.string().optional(),
     description: z.string(), // Removed .min(5) here, validation moved to superRefine
-    attachmentUrl: z.string().min(1, 'At least one photo required'),
+    attachmentUrl: z.array(z.string()).min(1, 'At least one photo required').max(3, 'Max 3 files allowed'),
 }).superRefine((data, ctx) => {
+    // Other Cause Validation
+    if (data.issueCausedBy === 'Other' && (!data.otherIssueCauseDescription || data.otherIssueCauseDescription.trim().length < 1)) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Please specify the cause.",
+            path: ["otherIssueCauseDescription"],
+        });
+    }
+
     // Description validation: Need either text > 5 chars OR implicitly a voice note (which auto-fills text)
-    // The requirement says: "Input description OR voice note".
-    // If voice note recorded -> we auto-fill description with "Description in voice note".
-    // So checking description.length > 0 is actually sufficient IF we enforce the auto-fill.
-    // However, if manual text: "min(5)". If auto-fill: "Description in voice note" > 5.
-    // So simple .min(1, "Please provide a description or record a voice note") on description might work, 
-    // but better to be explicit about the length for typed text.
 
     if (data.description.length < 5) {
         ctx.addIssue({
@@ -59,9 +63,12 @@ export default function ReportIssuePage() {
     const [isRecording, setIsRecording] = useState(false);
     const [isMocking, setIsMocking] = useState(false);
     const [audioUrl, setAudioUrl] = useState<string | null>(null);
-    const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
     const [recordingTime, setRecordingTime] = useState(0);
-    const [timerInterval, setTimerInterval] = useState<NodeJS.Timeout | null>(null);
+
+    // Refs for mutable instances to avoid stale closures in timeouts/callbacks
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const stopTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -71,11 +78,12 @@ export default function ReportIssuePage() {
             unitId: '',
             otherArea: '',
             otherAreaDetails: '',
-            issueCausedBy: 'Tenant Misuse',
+            issueCausedBy: '',
+            otherIssueCauseDescription: '',
             complaintType: '',
             otherComplaintType: '',
             description: '',
-            attachmentUrl: '',
+            attachmentUrl: [],
         },
     });
 
@@ -83,6 +91,15 @@ export default function ReportIssuePage() {
     const complaintType = form.watch('complaintType');
     const selectedArea = form.watch('otherArea'); // Watching the dropdown value
     const description = form.watch('description');
+    const issueCausedBy = form.watch('issueCausedBy'); // Watch cause to conditonally show other field
+
+    // Reset other issue description if cause changes from Other
+    useEffect(() => {
+        if (issueCausedBy !== 'Other') {
+            form.setValue('otherIssueCauseDescription', '');
+        }
+    }, [issueCausedBy, form]);
+
 
     // Auto-fill description logic
     useEffect(() => {
@@ -118,21 +135,58 @@ export default function ReportIssuePage() {
     useEffect(() => {
         return () => {
             if (audioUrl) URL.revokeObjectURL(audioUrl);
-            if (timerInterval) clearInterval(timerInterval);
+            if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+            if (stopTimeoutRef.current) clearTimeout(stopTimeoutRef.current);
         };
-    }, [audioUrl, timerInterval]);
+    }, [audioUrl]);
+
+    const stopRecording = () => {
+        if (timerIntervalRef.current) {
+            clearInterval(timerIntervalRef.current);
+            timerIntervalRef.current = null;
+        }
+        if (stopTimeoutRef.current) {
+            clearTimeout(stopTimeoutRef.current);
+            stopTimeoutRef.current = null;
+        }
+        setIsRecording(false);
+
+        // Check ref for mocking state is tricky if we don't save it to ref, 
+        // but we can trust the current render scope for 'isMocking' IF this function is called from UI.
+        // BUT if called from timeout, 'isMocking' might be stale? 
+        // Actually, 'isMocking' doesn't change during recording. So capture value is fine.
+        // Wait, if I start (isMocking=false), then 30s later timeout calls this, isMocking is false. Correct.
+
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+            mediaRecorderRef.current.stop();
+        } else if (isMocking) { // Fallback for mock which doesn't use mediaRecorderRef
+            // Create dummy blob
+            const blob = new Blob(['Mock audio content'], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            setAudioUrl(url);
+            toast.info('Recording saved.');
+        }
+    };
 
     const startRecording = async () => {
         // Reset states
         setIsMocking(false);
-        setMediaRecorder(null);
+        mediaRecorderRef.current = null;
+        setAudioUrl(null); // Clear previous if any
 
         const runTimer = () => {
             setRecordingTime(0);
             const interval = setInterval(() => {
                 setRecordingTime(prev => prev + 1);
             }, 1000);
-            setTimerInterval(interval);
+            timerIntervalRef.current = interval;
+
+            // Auto-stop at exactly 30s (add slight buffer 30.5s to ensure UI shows 30)
+            const timeout = setTimeout(() => {
+                stopRecording();
+                toast.info('Max recording limit (30s) reached.');
+            }, 30500);
+            stopTimeoutRef.current = timeout;
         };
 
         // Check for browser support and secure context
@@ -161,7 +215,7 @@ export default function ReportIssuePage() {
             };
 
             recorder.start();
-            setMediaRecorder(recorder);
+            mediaRecorderRef.current = recorder;
             setIsRecording(true);
             runTimer();
 
@@ -182,25 +236,6 @@ export default function ReportIssuePage() {
                 setIsMocking(true);
                 runTimer();
             }
-        }
-    };
-
-    const stopRecording = () => {
-        if (timerInterval) {
-            clearInterval(timerInterval);
-            setTimerInterval(null);
-        }
-        setIsRecording(false);
-
-        if (isMocking) {
-            // Create dummy blob
-            const blob = new Blob(['Mock audio content'], { type: 'text/plain' });
-            // Use a sample audio file for better UX if possible, but strict blob is fine for now
-            const url = URL.createObjectURL(blob);
-            setAudioUrl(url);
-            toast.info('Recording simulated.');
-        } else if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-            mediaRecorder.stop();
         }
     };
 
@@ -229,6 +264,11 @@ export default function ReportIssuePage() {
                 ? undefined // Not used for UNIT
                 : (values.otherArea === 'Other' ? values.otherAreaDetails : values.otherArea);
 
+            // Handle Other Cause Description
+            const finalOtherCauseDescription = values.issueCausedBy === 'Other'
+                ? values.otherIssueCauseDescription
+                : null; // Explicitly null if not 'Other'
+
             const newIssue = await api.issues.create({
                 project_id: values.projectId,
                 reported_by_user_id: user.id,
@@ -236,6 +276,7 @@ export default function ReportIssuePage() {
                 unit_id: values.unitId,
                 other_area: finalArea, // Used computed area
                 issue_caused_by: values.issueCausedBy,
+                other_issue_cause_description: finalOtherCauseDescription, // New field
                 complaint_type: finalComplaintType,
                 description_text: values.description, // Validation handled by schema
                 status: IssueStatus.OPEN,
@@ -246,13 +287,16 @@ export default function ReportIssuePage() {
                 voice_url: audioUrl || undefined // Add voice URL if exists
             });
 
-            // Add attachment
-            await api.issues.addAttachment({
-                issue_id: newIssue.id,
-                url: values.attachmentUrl,
-                media_type: MediaType.IMAGE,
-                proof_type: ProofType.BEFORE
-            });
+            // Add attachments
+            // values.attachmentUrl is now an array of strings
+            await Promise.all(values.attachmentUrl.map(async (url) => {
+                await api.issues.addAttachment({
+                    issue_id: newIssue.id,
+                    url: url,
+                    media_type: MediaType.IMAGE,
+                    proof_type: ProofType.BEFORE
+                });
+            }));
 
             toast.success('Issue reported successfully');
             router.push('/app/worker/dashboard');
@@ -265,17 +309,31 @@ export default function ReportIssuePage() {
     };
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            // Mock upload: create object URL or just use a placeholder
-            // For persistence/localStorage, Object URL won't expire until refresh but reload kills it.
-            // Better to use a static placeholder or base64 (too big).
-            // I'll use a placeholder service with random text or the file name.
-            const fakeUrl = `https://placehold.co/600x400/png?text=${encodeURIComponent(file.name)}`;
-            form.setValue('attachmentUrl', fakeUrl);
-            toast.info('Photo uploaded (Mock URL generated)');
+        const files = e.target.files;
+        if (files && files.length > 0) {
+            const newFiles = Array.from(files);
+            const currentFiles = form.getValues('attachmentUrl') || [];
+
+            if (currentFiles.length + newFiles.length > 3) {
+                toast.error('Max 3 files allowed');
+                return;
+            }
+
+            // Mock upload for each
+            const newUrls = newFiles.map(file => `https://placehold.co/600x400/png?text=${encodeURIComponent(file.name)}`);
+            form.setValue('attachmentUrl', [...currentFiles, ...newUrls], { shouldValidate: true });
+            toast.info(`${newFiles.length} photo(s) uploaded`);
         }
+        // Reset input
+        e.target.value = '';
     };
+
+    const removeAttachment = (indexToRemove: number) => {
+        const currentFiles = form.getValues('attachmentUrl');
+        const newFiles = currentFiles.filter((_, index) => index !== indexToRemove);
+        form.setValue('attachmentUrl', newFiles, { shouldValidate: true });
+    };
+
 
     const COMMON_AREAS = [
         "Lobby", "Gym", "Garden", "Corridor / Hallway", "Parking", "Lift / Elevator",
@@ -401,30 +459,48 @@ export default function ReportIssuePage() {
                             )}
 
                             {/* Cause */}
-                            <FormField
-                                control={form.control}
-                                name="issueCausedBy"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Issue Caused By</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                            <FormControl>
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select cause" />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                <SelectItem value="Tenant Misuse">Tenant Misuse</SelectItem>
-                                                <SelectItem value="Wear and Tear">Wear and Tear</SelectItem>
-                                                <SelectItem value="Accidental">Accidental</SelectItem>
-                                                <SelectItem value="Construction Defect">Construction Defect</SelectItem>
-                                                <SelectItem value="Unknown">Unknown</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
+                            <div className="grid grid-cols-2 gap-4">
+                                <FormField
+                                    control={form.control}
+                                    name="issueCausedBy"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Issue Caused By</FormLabel>
+                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Select cause" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    <SelectItem value="Tenant Misuse">Tenant Misuse</SelectItem>
+                                                    <SelectItem value="Wear and Tear">Wear and Tear</SelectItem>
+                                                    <SelectItem value="Accidental">Accidental</SelectItem>
+                                                    <SelectItem value="Construction Defect">Construction Defect</SelectItem>
+                                                    <SelectItem value="Unknown">Unknown</SelectItem>
+                                                    <SelectItem value="Other">Other</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                {issueCausedBy === 'Other' && (
+                                    <FormField
+                                        control={form.control}
+                                        name="otherIssueCauseDescription"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Specify Cause</FormLabel>
+                                                <FormControl>
+                                                    <Input placeholder="Explain the cause..." {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
                                 )}
-                            />
+                            </div>
 
                             {/* Complaint Type */}
                             <div className="grid grid-cols-2 gap-4">
@@ -532,6 +608,14 @@ export default function ReportIssuePage() {
                                             <audio controls src={audioUrl} className="h-8 w-48" />
                                             <Button
                                                 type="button"
+                                                variant="secondary"
+                                                size="sm"
+                                                onClick={startRecording} // Re-record (Replace)
+                                            >
+                                                Replace
+                                            </Button>
+                                            <Button
+                                                type="button"
                                                 variant="ghost"
                                                 size="sm"
                                                 className="text-destructive hover:text-destructive"
@@ -550,26 +634,41 @@ export default function ReportIssuePage() {
                                 name="attachmentUrl"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Photo Evidence (Required)</FormLabel>
-                                        <div className="flex items-center gap-4">
-                                            <Input
-                                                type="file"
-                                                accept="image/*"
-                                                onChange={handleFileUpload}
-                                                className="cursor-pointer"
-                                            />
-                                            {field.value && (
-                                                <div className="h-10 w-10 bg-slate-200 rounded overflow-hidden flex-shrink-0 relative">
-                                                    <Image
-                                                        src={field.value}
-                                                        alt="Preview"
-                                                        fill
-                                                        className="object-cover"
-                                                    />
-                                                </div>
-                                            )}
+                                        <FormLabel>Photo Evidence (Max 3)</FormLabel>
+                                        <div className="space-y-4">
+                                            <div className="flex gap-4 flex-wrap">
+                                                {field.value.map((url, index) => (
+                                                    <div key={index} className="h-20 w-20 bg-slate-200 rounded overflow-hidden flex-shrink-0 relative group">
+                                                        <Image
+                                                            src={url}
+                                                            alt={`Evindence ${index + 1}`}
+                                                            fill
+                                                            className="object-cover"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeAttachment(index)}
+                                                            className="absolute top-0 right-0 bg-red-500 text-white p-1 rounded-bl opacity-75 hover:opacity-100"
+                                                        >
+                                                            <Trash2 className="h-3 w-3" />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                                {field.value.length < 3 && (
+                                                    <div className="h-20 w-20 border-2 border-dashed border-slate-300 rounded flex items-center justify-center relative cursor-pointer hover:bg-slate-50">
+                                                        <span className="text-xs text-slate-500 font-medium">+ Add</span>
+                                                        <Input
+                                                            type="file"
+                                                            accept="image/*"
+                                                            multiple
+                                                            onChange={handleFileUpload}
+                                                            className="absolute inset-0 opacity-0 cursor-pointer"
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <FormMessage />
                                         </div>
-                                        <FormMessage />
                                     </FormItem>
                                 )}
                             />

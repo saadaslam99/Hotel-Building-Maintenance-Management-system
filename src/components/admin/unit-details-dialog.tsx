@@ -15,30 +15,23 @@ import { Switch } from '@/components/ui/switch';
 import {
     Form, FormControl, FormField, FormItem, FormLabel, FormMessage
 } from '@/components/ui/form';
-import {
-    Select, SelectContent, SelectItem, SelectTrigger, SelectValue
-} from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from '@/mock/api';
-import { Unit, OccupantType, ClientUnitAssignment } from '@/mock/types';
-import { toast } from 'sonner';
-import { Loader2, Search, User, History as HistoryIcon, Building } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
+import { Loader2, User, History as HistoryIcon, Edit2, X, Check } from 'lucide-react';
+import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { Unit, ClientUnitAssignment } from '@/mock/types';
 
 const occupantFormSchema = z.object({
     unitName: z.string().min(1, 'Unit name required'),
     isOccupied: z.boolean(),
     // Occupant details (required if isOccupied is true)
-    occupantType: z.nativeEnum(OccupantType).optional(),
     fullName: z.string().optional(),
     idPassport: z.string().optional(),
     phone: z.string().optional(),
 }).superRefine((data, ctx) => {
     if (data.isOccupied) {
-        if (!data.occupantType) {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Type is required", path: ["occupantType"] });
-        }
         if (!data.fullName || data.fullName.length < 2) {
             ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Name is required", path: ["fullName"] });
         }
@@ -69,6 +62,8 @@ export function UnitDetailsDialog({ unit, projectId, open, onOpenChange, onSucce
     // Search state
     const [isSearching, setIsSearching] = useState(false);
     const [foundOccupant, setFoundOccupant] = useState(false);
+    const [originalOccupant, setOriginalOccupant] = useState<any>(null);
+    const [isEditing, setIsEditing] = useState(false);
 
     const isCreateMode = !unit;
 
@@ -77,7 +72,6 @@ export function UnitDetailsDialog({ unit, projectId, open, onOpenChange, onSucce
         defaultValues: {
             unitName: '',
             isOccupied: false,
-            occupantType: OccupantType.TENANT,
             fullName: '',
             idPassport: '',
             phone: '',
@@ -92,7 +86,6 @@ export function UnitDetailsDialog({ unit, projectId, open, onOpenChange, onSucce
                 form.reset({
                     unitName: unit.unit_no,
                     isOccupied: unit.is_occupied,
-                    occupantType: OccupantType.TENANT,
                     fullName: '',
                     idPassport: '',
                     phone: '',
@@ -100,20 +93,31 @@ export function UnitDetailsDialog({ unit, projectId, open, onOpenChange, onSucce
 
                 if (unit.is_occupied && unit.current_occupant_id) {
                     api.units.getHistory(unit.id).then(setHistory);
+                    api.occupants.getById(unit.current_occupant_id).then(occ => {
+                        if (occ) {
+                            setOriginalOccupant(occ);
+                            form.setValue('fullName', occ.name);
+                            form.setValue('idPassport', occ.id_passport);
+                            form.setValue('phone', occ.phone || '');
+                        }
+                    });
                 } else {
                     setHistory([]);
+                    setOriginalOccupant(null);
                 }
+                setIsEditing(false);
             } else {
                 // Create Mode
                 form.reset({
                     unitName: '',
                     isOccupied: false,
-                    occupantType: OccupantType.TENANT,
                     fullName: '',
                     idPassport: '',
                     phone: '',
                 });
                 setHistory([]);
+                setOriginalOccupant(null);
+                setIsEditing(true); // Always edit in create mode
             }
             setFoundOccupant(false);
         }
@@ -132,7 +136,6 @@ export function UnitDetailsDialog({ unit, projectId, open, onOpenChange, onSucce
             if (exactMatch) {
                 form.setValue('fullName', exactMatch.name);
                 form.setValue('phone', exactMatch.phone || '');
-                form.setValue('occupantType', exactMatch.type);
                 setFoundOccupant(true);
                 toast.success("Existing occupant found!");
             } else {
@@ -164,7 +167,6 @@ export function UnitDetailsDialog({ unit, projectId, open, onOpenChange, onSucce
                         name: values.fullName!,
                         id_passport: values.idPassport!,
                         phone: values.phone!,
-                        type: values.occupantType!,
                         assigned_by_user_id: currentUser.id
                     } : undefined
                 );
@@ -179,7 +181,6 @@ export function UnitDetailsDialog({ unit, projectId, open, onOpenChange, onSucce
                     await api.units.update(unit.id, { unit_no: values.unitName });
                 }
 
-                // 2. Status/Occupancy update
                 if (values.isOccupied !== unit.is_occupied || values.isOccupied) {
                     if (!values.isOccupied) {
                         // Vacating
@@ -189,14 +190,26 @@ export function UnitDetailsDialog({ unit, projectId, open, onOpenChange, onSucce
                         }
                     } else {
                         // Occupying / Updating
-                        await api.units.updateStatus(unit.id, true, {
-                            name: values.fullName!,
-                            id_passport: values.idPassport!,
-                            phone: values.phone!,
-                            type: values.occupantType!,
-                            assigned_by_user_id: currentUser.id
-                        });
-                        toast.success('Unit occupant updated');
+                        // Check if ID changed -> New Occupant
+                        const isIdChanged = originalOccupant && originalOccupant.id_passport !== values.idPassport;
+
+                        if (isIdChanged || !originalOccupant) {
+                            // NEW OCCUPANT or RE-OCCUPYING
+                            await api.units.updateStatus(unit.id, true, {
+                                name: values.fullName!,
+                                id_passport: values.idPassport!,
+                                phone: values.phone!,
+                                assigned_by_user_id: currentUser.id
+                            });
+                            toast.success('New occupant assigned');
+                        } else {
+                            // SAME OCCUPANT - UPDATE DETAILS
+                            await api.occupants.update(originalOccupant.id, {
+                                name: values.fullName,
+                                phone: values.phone
+                            });
+                            toast.success('Occupant details updated');
+                        }
                     }
                 } else {
                     if (values.unitName !== unit.unit_no) toast.success('Unit name updated');
@@ -283,90 +296,101 @@ export function UnitDetailsDialog({ unit, projectId, open, onOpenChange, onSucce
 
                                 {isOccupied && (
                                     <div className="space-y-4 border-t pt-4 animate-in fade-in slide-in-from-top-2">
-                                        <h4 className="font-medium flex items-center gap-2">
-                                            <User className="h-4 w-4" />
-                                            Occupant Details
-                                        </h4>
-
-                                        <FormField
-                                            control={form.control}
-                                            name="occupantType"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Type</FormLabel>
-                                                    <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                                                        <FormControl>
-                                                            <SelectTrigger>
-                                                                <SelectValue placeholder="Select type" />
-                                                            </SelectTrigger>
-                                                        </FormControl>
-                                                        <SelectContent>
-                                                            <SelectItem value={OccupantType.TENANT}>Tenant</SelectItem>
-                                                            <SelectItem value={OccupantType.GUEST}>Hotel Guest</SelectItem>
-                                                            <SelectItem value={OccupantType.STAFF}>Staff</SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
-                                                    <FormMessage />
-                                                </FormItem>
+                                        <div className="flex items-center justify-between">
+                                            <h4 className="font-medium flex items-center gap-2">
+                                                <User className="h-4 w-4" />
+                                                Occupant Details
+                                            </h4>
+                                            {!isCreateMode && unit?.is_occupied && (
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => setIsEditing(!isEditing)}
+                                                >
+                                                    {isEditing ? <X className="h-4 w-4 mr-1" /> : <Edit2 className="h-4 w-4 mr-1" />}
+                                                    {isEditing ? 'Cancel' : 'Edit'}
+                                                </Button>
                                             )}
-                                        />
+                                        </div>
 
-                                        <FormField
-                                            control={form.control}
-                                            name="idPassport"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Qatar ID / Passport</FormLabel>
-                                                    <div className="relative">
-                                                        <FormControl>
-                                                            <Input
-                                                                {...field}
-                                                                onBlur={() => {
-                                                                    field.onBlur();
-                                                                    handleIdBlur();
-                                                                }}
-                                                                placeholder="Enter unique ID to search..."
-                                                            />
-                                                        </FormControl>
-                                                        {isSearching && (
-                                                            <div className="absolute right-3 top-2.5">
-                                                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                                                            </div>
-                                                        )}
+                                        {!isEditing && unit?.is_occupied && originalOccupant ? (
+                                            <div className="space-y-3 bg-muted/30 p-3 rounded-lg border">
+                                                <div className="grid grid-cols-2 gap-2 text-sm">
+                                                    <div>
+                                                        <span className="text-muted-foreground block text-xs">Full Name</span>
+                                                        <span className="font-medium">{originalOccupant.name}</span>
                                                     </div>
-                                                    {foundOccupant && <p className="text-xs text-green-500 mt-1">Found existing occupant</p>}
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
+                                                    <div>
+                                                        <span className="text-muted-foreground block text-xs">ID / Passport</span>
+                                                        <span className="font-medium">{originalOccupant.id_passport}</span>
+                                                    </div>
+                                                    <div className="col-span-2">
+                                                        <span className="text-muted-foreground block text-xs">Phone</span>
+                                                        <span className="font-medium">{originalOccupant.phone || '-'}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-4">
+                                                <FormField
+                                                    control={form.control}
+                                                    name="idPassport"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel>Qatar ID / Passport</FormLabel>
+                                                            <div className="relative">
+                                                                <FormControl>
+                                                                    <Input
+                                                                        {...field}
+                                                                        onBlur={() => {
+                                                                            field.onBlur();
+                                                                            handleIdBlur();
+                                                                        }}
+                                                                        placeholder="Enter unique ID to search..."
+                                                                    />
+                                                                </FormControl>
+                                                                {isSearching && (
+                                                                    <div className="absolute right-3 top-2.5">
+                                                                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            {foundOccupant && <p className="text-xs text-green-500 mt-1">Found existing occupant</p>}
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
 
-                                        <FormField
-                                            control={form.control}
-                                            name="fullName"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Full Name</FormLabel>
-                                                    <FormControl>
-                                                        <Input {...field} />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
+                                                <FormField
+                                                    control={form.control}
+                                                    name="fullName"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel>Full Name</FormLabel>
+                                                            <FormControl>
+                                                                <Input {...field} />
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
 
-                                        <FormField
-                                            control={form.control}
-                                            name="phone"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Phone Number</FormLabel>
-                                                    <FormControl>
-                                                        <Input {...field} placeholder="+974..." />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
+                                                <FormField
+                                                    control={form.control}
+                                                    name="phone"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel>Phone Number</FormLabel>
+                                                            <FormControl>
+                                                                <Input {...field} placeholder="+974..." />
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 

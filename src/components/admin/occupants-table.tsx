@@ -62,7 +62,6 @@ export function OccupantsTable() {
                         <TableRow>
                             <TableHead>Occupant Name</TableHead>
                             <TableHead>ID / Passport</TableHead>
-                            <TableHead>Type</TableHead>
                             <TableHead>Project</TableHead>
                             <TableHead>Unit</TableHead>
                             <TableHead>Phone</TableHead>
@@ -85,9 +84,6 @@ export function OccupantsTable() {
                                         </div>
                                     </TableCell>
                                     <TableCell>{occupant.id_passport}</TableCell>
-                                    <TableCell>
-                                        <Badge variant="outline">{occupant.type}</Badge>
-                                    </TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-1 text-sm">
                                             <Building className="h-3 w-3 text-muted-foreground" />

@@ -1,7 +1,7 @@
 import {
     User, UserRole, Project, Unit, Client, WorkerProjectAssignment,
     ClientUnitAssignment, Issue, IssueStatus, IssuePriority,
-    LocationType, ProofType, MediaType, IssueAttachment, OccupantType
+    LocationType, ProofType, MediaType, IssueAttachment
 } from './types';
 
 export const SEED_USERS: User[] = [
@@ -109,7 +109,6 @@ export const SEED_CLIENTS: Client[] = [
         id: 'c1',
         id_passport: 'A1234567',
         name: 'Alice Johnson',
-        type: OccupantType.TENANT,
         phone: '9876543210',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),

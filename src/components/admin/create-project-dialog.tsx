@@ -6,18 +6,14 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import {
     Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
-    DialogTrigger, DialogFooter
+    DialogFooter
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
     Form, FormControl, FormField, FormItem, FormLabel, FormMessage
 } from '@/components/ui/form';
-import {
-    Select, SelectContent, SelectItem, SelectTrigger, SelectValue
-} from '@/components/ui/select';
 import { api } from '@/mock/api';
-import { User } from '@/mock/types';
 import { toast } from 'sonner';
 import { Loader2, Plus, Trash2 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
@@ -29,7 +25,6 @@ const projectFormSchema = z.object({
     units: z.array(z.object({
         unit_no: z.string().min(1, 'Unit number required')
     })).min(1, 'At least one unit is required'),
-    assignedWorkerIds: z.array(z.string()).min(1, 'Assign at least one worker'),
 });
 
 type ProjectFormValues = z.infer<typeof projectFormSchema>;
@@ -42,7 +37,6 @@ interface CreateProjectDialogProps {
 
 export function CreateProjectDialog({ open, onOpenChange, onSuccess }: CreateProjectDialogProps) {
     const { user: currentUser } = useAuthStore();
-    const [workers, setWorkers] = useState<User[]>([]);
     const [loading, setLoading] = useState(false);
 
     const form = useForm<ProjectFormValues>({
@@ -52,7 +46,6 @@ export function CreateProjectDialog({ open, onOpenChange, onSuccess }: CreatePro
             addressLine: '',
             numberOfUnits: 1,
             units: [{ unit_no: 'Unit 1' }],
-            assignedWorkerIds: [],
         },
     });
 
@@ -81,12 +74,6 @@ export function CreateProjectDialog({ open, onOpenChange, onSuccess }: CreatePro
         }
     }, [watchedNumberOfUnits, replace, form]);
 
-    useEffect(() => {
-        if (open) {
-            api.users.getWorkers().then(setWorkers).catch(console.error);
-        }
-    }, [open]);
-
     const onSubmit = async (values: ProjectFormValues) => {
         if (!currentUser) return;
         setLoading(true);
@@ -108,22 +95,12 @@ export function CreateProjectDialog({ open, onOpenChange, onSuccess }: CreatePro
                 })
             ));
 
-            // 3. Assign Workers
-            await Promise.all(values.assignedWorkerIds.map(workerId =>
-                api.projects.assignWorker({
-                    project_id: newProject.id,
-                    worker_user_id: workerId,
-                    assigned_by_user_id: currentUser.id,
-                })
-            ));
-
             toast.success('Project created successfully');
             form.reset({
                 name: '',
                 addressLine: '',
                 numberOfUnits: 1,
                 units: [{ unit_no: 'Unit 1' }],
-                assignedWorkerIds: [],
             });
             onSuccess();
             onOpenChange(false);
@@ -141,7 +118,7 @@ export function CreateProjectDialog({ open, onOpenChange, onSuccess }: CreatePro
                 <DialogHeader>
                     <DialogTitle>Create New Project</DialogTitle>
                     <DialogDescription>
-                        Add a new property to the system. Assign units and workers.
+                        Add a new property to the system.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -223,65 +200,6 @@ export function CreateProjectDialog({ open, onOpenChange, onSuccess }: CreatePro
                             {form.formState.errors.units && (
                                 <p className="text-sm text-destructive">{form.formState.errors.units.message}</p>
                             )}
-                        </div>
-
-                        {/* Workers */}
-                        <div className="space-y-4">
-                            <h3 className="text-lg font-medium">Assign Workers</h3>
-                            <FormField
-                                control={form.control}
-                                name="assignedWorkerIds"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Select Workers</FormLabel>
-                                        <Select
-                                            onValueChange={(value: string) => {
-                                                if (!field.value.includes(value)) {
-                                                    field.onChange([...field.value, value]);
-                                                }
-                                            }}
-                                        >
-                                            <FormControl>
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Add a worker..." />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                {workers.map(w => (
-                                                    <SelectItem
-                                                        key={w.id}
-                                                        value={w.id}
-                                                        disabled={field.value.includes(w.id)}
-                                                    >
-                                                        {w.full_name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        <div className="flex flex-wrap gap-2 mt-2">
-                                            {field.value.map(id => {
-                                                const worker = workers.find(w => w.id === id);
-                                                return (
-                                                    <div key={id} className="flex items-center bg-secondary text-secondary-foreground px-3 py-1 rounded-full text-sm">
-                                                        <span>{worker?.full_name || id}</span>
-                                                        <Button
-                                                            type="button"
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-4 w-4 ml-2 hover:bg-transparent"
-                                                            onClick={() => field.onChange(field.value.filter(v => v !== id))}
-                                                        >
-                                                            <span className="sr-only">Remove</span>
-                                                            &times;
-                                                        </Button>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
                         </div>
 
                         <DialogFooter>

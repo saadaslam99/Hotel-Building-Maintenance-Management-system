@@ -72,7 +72,8 @@
       "is_occupied": true,
       "created_by_user_id": "u2",
       "created_at": "2026-01-17T17:19:20.595Z",
-      "updated_at": "2026-01-17T17:19:20.595Z"
+      "updated_at": "2026-01-20T18:28:30.857Z",
+      "current_occupant_id": "c-1768933710854"
     },
     {
       "id": "unit2",
@@ -122,6 +123,14 @@
       "type": "TENANT",
       "created_at": "2026-01-17T18:17:05.160Z",
       "updated_at": "2026-01-17T18:17:05.160Z"
+    },
+    {
+      "id": "c-1768933710854",
+      "name": "afdfseasdcd",
+      "id_passport": "34556436",
+      "phone": "4335342546",
+      "created_at": "2026-01-20T18:28:30.854Z",
+      "updated_at": "2026-01-20T18:28:30.854Z"
     }
   ],
   "workerAssignments": [
@@ -165,6 +174,16 @@
       "is_active": true,
       "created_at": "2026-01-17T18:17:05.161Z",
       "updated_at": "2026-01-17T18:17:05.161Z"
+    },
+    {
+      "id": "ca-1768933710855",
+      "client_id": "c-1768933710854",
+      "unit_id": "unit1",
+      "assigned_by_user_id": "u1",
+      "start_date": "2026-01-20T18:28:30.855Z",
+      "is_active": true,
+      "created_at": "2026-01-20T18:28:30.855Z",
+      "updated_at": "2026-01-20T18:28:30.855Z"
     }
   ],
   "issues": [
@@ -177,17 +196,20 @@
       "issue_caused_by": "Tenant Misuse",
       "complaint_type": "Plumbing",
       "description_text": "Leaking faucet in kitchen",
-      "status": "OPEN",
+      "status": "RESOLVED",
       "priority": "HIGH",
-      "approved": false,
-      "verified": false,
-      "is_actionable": true,
+      "approved": true,
+      "verified": true,
+      "is_actionable": false,
       "created_at": "2026-01-16T17:19:20.595Z",
-      "updated_at": "2026-01-19T18:59:37.919Z",
+      "updated_at": "2026-01-20T18:49:14.461Z",
       "assigned_vendor_name": "fedgdg",
       "approved_by_user_id": "u1",
-      "approved_at": "2026-01-19T17:47:37.691Z",
-      "approval_note": ""
+      "approved_at": "2026-01-20T18:48:09.159Z",
+      "approval_note": "",
+      "verified_at": "2026-01-20T18:49:14.384Z",
+      "verified_by_user_id": "u1",
+      "verification_comment": ""
     },
     {
       "id": "i2",
@@ -284,6 +306,14 @@
       "proof_type": "VERIFICATION",
       "id": "att-1768847463720",
       "created_at": "2026-01-19T18:31:03.720Z"
+    },
+    {
+      "issue_id": "i1",
+      "url": "https://placehold.co/600x400/png?text=Verification-WhatsApp%20Image%202026-01-07%20at%202.03.09%20AM.jpeg",
+      "media_type": "IMAGE",
+      "proof_type": "VERIFICATION",
+      "id": "att-1768934949595",
+      "created_at": "2026-01-20T18:49:09.595Z"
     }
   ],
   "history": [],

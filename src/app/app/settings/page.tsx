@@ -10,13 +10,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import {
     User,
     Lock,
     Bell,
-    Settings,
     Shield,
     Save,
 } from 'lucide-react';
@@ -32,7 +30,7 @@ export default function SettingsPage() {
     const [preferences, setPreferences] = useState({
         theme: 'system',
         language: 'en',
-        timezone: 'utc+5',
+        timezone: 'qt', // Default to Qatar
         emailNotifications: true,
         pushNotifications: false,
         marketingEmails: false,
@@ -56,7 +54,7 @@ export default function SettingsPage() {
         // Mock API call
         setTimeout(() => {
             setIsLoading(false);
-            toast.success('Preferences saved successfully');
+            toast.success('Settings saved successfully');
         }, 1000);
     };
 
@@ -67,7 +65,7 @@ export default function SettingsPage() {
             <div className="flex flex-col gap-2">
                 <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
                 <p className="text-muted-foreground">
-                    Manage your profile, preferences, and view account details.
+                    Manage your profile and account settings.
                 </p>
             </div>
 
@@ -84,28 +82,12 @@ export default function SettingsPage() {
                             Profile
                         </Button>
                         <Button
-                            variant={activeTab === 'preferences' ? 'secondary' : 'ghost'}
-                            className="justify-start gap-2 w-full"
-                            onClick={() => setActiveTab('preferences')}
-                        >
-                            <Settings className="h-4 w-4" />
-                            Preferences
-                        </Button>
-                        <Button
                             variant={activeTab === 'notifications' ? 'secondary' : 'ghost'}
                             className="justify-start gap-2 w-full"
                             onClick={() => setActiveTab('notifications')}
                         >
                             <Bell className="h-4 w-4" />
                             Notifications
-                        </Button>
-                        <Button
-                            variant={activeTab === 'system' ? 'secondary' : 'ghost'}
-                            className="justify-start gap-2 w-full"
-                            onClick={() => setActiveTab('system')}
-                        >
-                            <Shield className="h-4 w-4" />
-                            System Info
                         </Button>
                     </nav>
                 </aside>
@@ -154,22 +136,6 @@ export default function SettingsPage() {
                                                 <Lock className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground/50" />
                                             </div>
                                         </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="phone">Phone Number</Label>
-                                            <div className="relative">
-                                                <Input id="phone" value={user.phone || 'N/A'} disabled className="bg-muted text-muted-foreground pr-10" />
-                                                <Lock className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground/50" />
-                                            </div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="account-status">Account Status</Label>
-                                            <Input
-                                                id="account-status"
-                                                value={user.active ? 'Active' : 'Inactive'}
-                                                disabled
-                                                className={`font-medium ${user.active ? 'text-green-600' : 'text-red-500'} bg-muted`}
-                                            />
-                                        </div>
                                     </div>
                                     <Separator className="my-0" />
 
@@ -178,78 +144,6 @@ export default function SettingsPage() {
                                         <p>
                                             To update your personal details or password, please contact the IT department or your system administrator.
                                         </p>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
-                    )}
-
-                    {/* Preferences Section */}
-                    {activeTab === 'preferences' && (
-                        <div className="animation-fade-in space-y-6">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Preferences</CardTitle>
-                                    <CardDescription>
-                                        Customize your interface experience.
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-6">
-                                    <div className="grid gap-6 md:grid-cols-2">
-                                        <div className="space-y-2">
-                                            <Label>Theme</Label>
-                                            <Select
-                                                value={preferences.theme}
-                                                onValueChange={(val) => setPreferences({ ...preferences, theme: val })}
-                                            >
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select theme" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="light">Light</SelectItem>
-                                                    <SelectItem value="dark">Dark</SelectItem>
-                                                    <SelectItem value="system">System</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Language</Label>
-                                            <Select
-                                                value={preferences.language}
-                                                onValueChange={(val) => setPreferences({ ...preferences, language: val })}
-                                            >
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select language" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="en">English (US)</SelectItem>
-                                                    <SelectItem value="es">Español</SelectItem>
-                                                    <SelectItem value="fr">Français</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Timezone</Label>
-                                            <Select
-                                                value={preferences.timezone}
-                                                onValueChange={(val) => setPreferences({ ...preferences, timezone: val })}
-                                            >
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select timezone" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="utc">UTC (Coordinated Universal Time)</SelectItem>
-                                                    <SelectItem value="utc+5">UTC+05:00 (Islamabad, Karachi)</SelectItem>
-                                                    <SelectItem value="pst">PST (Pacific Standard Time)</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                    </div>
-                                    <div className="flex justify-end">
-                                        <Button onClick={handleSavePreferences} disabled={isLoading}>
-                                            <Save className="mr-2 h-4 w-4" />
-                                            {isLoading ? 'Saving...' : 'Save Changes'}
-                                        </Button>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -310,48 +204,6 @@ export default function SettingsPage() {
                                             <Save className="mr-2 h-4 w-4" />
                                             {isLoading ? 'Saving...' : 'Save Preferences'}
                                         </Button>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
-                    )}
-
-                    {/* System Info Section */}
-                    {activeTab === 'system' && (
-                        <div className="animation-fade-in space-y-6">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>System Information</CardTitle>
-                                    <CardDescription>
-                                        Technical details about your account and session.
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="grid gap-4 md:grid-cols-2">
-                                        <div className="p-4 rounded-lg bg-muted/50 border space-y-1">
-                                            <p className="text-xs font-medium text-muted-foreground uppercase">User ID</p>
-                                            <p className="font-mono text-sm">{user.id}</p>
-                                        </div>
-                                        <div className="p-4 rounded-lg bg-muted/50 border space-y-1">
-                                            <p className="text-xs font-medium text-muted-foreground uppercase">Account Created</p>
-                                            <p className="font-medium text-sm">
-                                                {new Date(user.created_at).toLocaleDateString(undefined, {
-                                                    dateStyle: 'long',
-                                                })}
-                                            </p>
-                                        </div>
-                                        <div className="p-4 rounded-lg bg-muted/50 border space-y-1">
-                                            <p className="text-xs font-medium text-muted-foreground uppercase">Last Updated</p>
-                                            <p className="font-medium text-sm">
-                                                {new Date(user.updated_at).toLocaleDateString(undefined, {
-                                                    dateStyle: 'long',
-                                                })}
-                                            </p>
-                                        </div>
-                                        <div className="p-4 rounded-lg bg-muted/50 border space-y-1">
-                                            <p className="text-xs font-medium text-muted-foreground uppercase">Version</p>
-                                            <p className="font-medium text-sm">v1.0.0 (Internal Release)</p>
-                                        </div>
                                     </div>
                                 </CardContent>
                             </Card>
