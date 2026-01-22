@@ -40,11 +40,11 @@ export const SEED_USERS: User[] = [
     },
     {
         id: 'u4',
-        employee_id: 'owner',
-        full_name: 'Building Owner',
-        role: UserRole.ADMIN, // Owner maps to ADMIN permissions
+        employee_id: 'subadmin',
+        full_name: 'Building Sub-Admin',
+        role: UserRole.SUB_ADMIN,
         phone: '5555555555',
-        password: 'owner123',
+        password: 'subadmin123',
         active: true,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),

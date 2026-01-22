@@ -34,8 +34,7 @@ export function LoginForm() {
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
         try {
-            await login(values.employeeId, values.password);
-            const user = useAuthStore.getState().user;
+            const user = await login(values.employeeId, values.password);
 
             toast.success('Logged in successfully');
 
@@ -43,7 +42,7 @@ export function LoginForm() {
                 router.push('/app/worker/dashboard');
             } else if (user?.role === UserRole.MANAGER) {
                 router.push('/app/manager/overview');
-            } else if (user?.role === UserRole.ADMIN) {
+            } else if (user?.role === UserRole.ADMIN || user?.role === UserRole.SUB_ADMIN) {
                 router.push('/app/admin/overview');
             } else {
                 router.push('/app/profile'); // Fallback

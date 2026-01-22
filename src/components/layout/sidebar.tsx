@@ -4,10 +4,9 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth-store';
-import { UserRole } from '@/mock/types';
+import { getNavItemsForRole } from '@/lib/auth/access-control';
 import {
-    LayoutDashboard, PlusCircle, ListTodo, CheckSquare,
-    Users, Building, Briefcase, Key, FileText, Settings, LogOut, ShieldAlert, Archive
+    Settings, LogOut
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -20,45 +19,8 @@ export function Sidebar({ className }: { className?: string }) {
         window.location.href = '/login';
     };
 
-    const getLinks = () => {
-        if (!user) return [];
 
-        switch (user.role) {
-            case UserRole.WORKER:
-                return [
-                    { href: '/app/worker/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-                    { href: '/app/worker/report-issue', label: 'Report Issue', icon: PlusCircle },
-                    { href: '/app/worker/issues', label: 'My Issues', icon: ListTodo },
-                    { href: '/app/worker/work-verification', label: 'Verification', icon: CheckSquare },
-                ];
-            case UserRole.MANAGER:
-                return [
-                    { href: '/app/manager/overview', label: 'Overview', icon: LayoutDashboard },
-                    { href: '/app/manager/issues', label: 'Issues', icon: ListTodo },
-                    { href: '/app/manager/workers', label: 'Workers', icon: Users },
-                    { href: '/app/manager/projects', label: 'Projects', icon: Building },
-                    { href: '/app/manager/assignments', label: 'Assignments', icon: Briefcase },
-                    { href: '/app/manager/units', label: 'Units & Clients', icon: Key },
-                    { href: '/app/manager/reports', label: 'Reports', icon: FileText },
-                ];
-            case UserRole.ADMIN:
-                return [
-                    { href: '/app/admin/overview', label: 'System Overview', icon: LayoutDashboard },
-                    { href: '/app/admin/users', label: 'All Users', icon: Users },
-                    { href: '/app/admin/managers', label: 'Managers', icon: Users },
-                    { href: '/app/admin/workers', label: 'Workers', icon: Users },
-                    { href: '/app/admin/issues', label: 'Issues', icon: ListTodo },
-                    { href: '/app/admin/history', label: 'History', icon: Archive },
-                    { href: '/app/admin/logs', label: 'System Logs', icon: FileText },
-                    { href: '/app/admin/projects', label: 'All Projects', icon: Building },
-                    { href: '/app/admin/system', label: 'System Settings', icon: ShieldAlert },
-                ];
-            default:
-                return [];
-        }
-    };
-
-    const links = getLinks();
+    const links = user ? getNavItemsForRole(user.role) : [];
 
     return (
         <div className={cn("pb-12 min-h-screen border-r bg-slate-900 text-white", className)}>

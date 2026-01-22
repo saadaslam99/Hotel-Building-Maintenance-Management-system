@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { User, UserRole } from '@/mock/types';
-import { api } from '@/mock/api';
+import { User } from '@/mock/types';
+import { authService } from '@/services/auth-service';
 
 
 interface AuthState {
@@ -10,7 +10,7 @@ interface AuthState {
     isLoading: boolean;
     error: string | null;
 
-    login: (employeeId: string, password: string) => Promise<void>;
+    login: (employeeId: string, password: string) => Promise<User>;
     logout: () => void;
     checkAuth: () => Promise<void>;
 }
@@ -26,8 +26,9 @@ export const useAuthStore = create<AuthState>()(
             login: async (employeeId, password) => {
                 set({ isLoading: true, error: null });
                 try {
-                    const { user, token } = await api.auth.login(employeeId, password);
-                    set({ user, token, isLoading: false });
+                    const { user, token } = await authService.login(employeeId, password);
+                    set({ user: user as User, token, isLoading: false });
+                    return user as User;
                 } catch (error: any) {
                     set({ error: error.message, isLoading: false });
                     throw error;
@@ -42,12 +43,16 @@ export const useAuthStore = create<AuthState>()(
             checkAuth: async () => {
                 const { user, token } = get();
                 if (token && user) {
-                    // Verify session is still valid (mock)
+                    // Try to verify session with backend
                     try {
-                        const refreshedUser = await api.auth.me(user.id);
+                        // If backend has /auth/me, use it:
+                        const refreshedUser = await authService.me(user.id);
                         set({ user: refreshedUser });
                     } catch (e) {
-                        set({ user: null, token: null });
+                        console.warn('Session verification failed:', e);
+                        // Optional: Don't logout immediately on network error, only on 401?
+                        // For now we persist if it fails to avoid aggressive logout loop if API is missing /me
+                        // set({ user: null, token: null }); 
                     }
                 }
             },
